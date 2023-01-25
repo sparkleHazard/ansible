@@ -9,4 +9,16 @@
       name:
         - tmux
         - htop
-        - neovim
+        - vim
+        - fd-find
+        - rsync
+        - exa
+        - bat
+        - ripgrep
+        - zsh
+        - nodejs
+        - zoxide
+        - fzf
+        - xclip
+        - git
+        - qemu-guest-agent
