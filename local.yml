@@ -1,0 +1,12 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+
+  tasks:
+  - name: install packages
+    package:
+      name:
+        - tmux
+        - htop
+        - nvim
