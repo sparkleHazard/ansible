@@ -1,1 +1,5 @@
-.zsh_plugins.txt
+jeffreytse/zsh-vi-mode
+zdharma-continuum/fast-syntax-highlighting kind:defer
+zsh-users/zsh-autosuggestions
+TwoPizza9621536/zsh-exa
+joshskidmore/zsh-fzf-history-search kind:defer

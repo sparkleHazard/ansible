@@ -22,3 +22,4 @@
         - xclip
         - git
         - qemu-guest-agent
+        - awscli
