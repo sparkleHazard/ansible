@@ -57,6 +57,13 @@
       name: root
       shell: /bin/zsh
 
+  - name: copy .antidote directory
+    copy:
+      src: dotfiles/.antidote
+      dest: /home/alan1/.antidote
+      owner: alan1
+      group: alan1
+
   - name: copy .zshrc file
     copy:
       src: dotfiles/.zshrc
@@ -98,6 +105,13 @@
       dest: /home/alan1/.aliases
       owner: alan1
       group: alan1
+
+  - name: copy .antidote directory
+    copy:
+      src: dotfiles/.antidote
+      dest: /root/.antidote
+      owner: root
+      group: root
 
   - name: copy .zshrc file
     copy:
