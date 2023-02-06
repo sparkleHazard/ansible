@@ -61,6 +61,11 @@
       cmd: curl -sS https://starship.rs/install.sh | sh -s -- -y
       warn: False
 
+  - name: install nvm
+    ansible.builtin.shell:
+      cmd: curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
+      warn: False
+
   - name: Clone antidote repository for alan1
     git:
       repo: https://github.com/mattmc3/antidote.git
