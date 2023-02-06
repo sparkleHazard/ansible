@@ -1,0 +1,95 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+
+  tasks:
+  - name: install packages
+    package:
+      name:
+        - tmux
+        - htop
+        - vim
+        - fd-find
+        - rsync
+        - exa
+        - bat
+        - ripgrep
+        - zsh
+        - nodejs
+        - zoxide
+        - fzf
+        - xclip
+        - git
+        - qemu-guest-agent
+        - awscli
+
+  - name: copy .zshrc file
+    copy:
+      src: dotfiles/.zshrc
+      dest: /home/alan1/.zshrc
+      owner: alan1
+      group: alan1
+
+  - name: copy .tmux.conf file
+    copy:
+      src: dotfiles/.tmux.conf
+      dest: /home/alan1/.tmux.conf
+      owner: alan1
+      group: alan1
+
+  - name: copy .tmuxline.conf file
+    copy:
+      src: dotfiles/.tmuxline.conf
+      dest: /home/alan1/.tmuxline.conf
+      owner: alan1
+      group: alan1
+
+  - name: copy .zsh_plugins.txt file
+    copy:
+      src: dotfiles/.zsh_plugins.txt
+      dest: /home/alan1/.zsh_plugins.txt
+      owner: alan1
+      group: alan1
+
+  - name: copy .vimrc file
+    copy:
+      src: dotfiles/.vimrc
+      dest: /home/alan1/.vimrc
+      owner: alan1
+      group: alan1
+
+  - name: copy .aliases file
+    copy:
+      src: dotfiles/.aliases
+      dest: /home/alan1/.aliases
+      owner: alan1
+      group: alan1
+
+  - name: add ansible user
+    user:
+      name: ansible
+      system: yes
+
+  - name: set up sudo for alan1
+    copy:
+      src: sudoers/alan1
+      dest: /etc/sudoers.d/alan1
+      owner: root
+      group: root
+      mode: 0440
+
+  - name: set up sudo for ansible user
+    copy:
+      src: sudoers/ansible
+      dest: /etc/sudoers.d/ansible
+      owner: root
+      group: root
+      mode: 0440
+
+  - name: add ansible-pull cron job
+    cron:
+      name: ansible auto-provision
+      user: ansible
+      minute: "*/10"
+      job: ansible-pull -o -U https://github.com/sparkleHazard/ansible.git
