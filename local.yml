@@ -37,6 +37,7 @@
         - git
         - qemu-guest-agent
         - awscli
+        - sudo
 
   - name: add alan1 user
     tags: always
