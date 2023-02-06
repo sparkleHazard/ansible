@@ -30,13 +30,11 @@
         - bat
         - ripgrep
         - zsh
-        - nodejs
         - zoxide
         - fzf
         - xclip
         - git
         - qemu-guest-agent
-        - awscli
         - sudo
 
   - name: add alan1 user
