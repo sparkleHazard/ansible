@@ -38,6 +38,12 @@
         - qemu-guest-agent
         - awscli
 
+  - name: add alan1 user
+    tags: always
+    user:
+      name: alan1
+      groups: alan1
+
   - name: copy .zshrc file
     copy:
       src: dotfiles/.zshrc
@@ -79,6 +85,49 @@
       dest: /home/alan1/.aliases
       owner: alan1
       group: alan1
+
+  - name: copy .zshrc file
+    copy:
+      src: dotfiles/.zshrc
+      dest: /root/.zshrc
+      owner: root
+      group: root
+
+  - name: copy .tmux.conf file
+    copy:
+      src: dotfiles/.tmux.conf
+      dest: /root/.tmux.conf
+      owner: root
+      group: root
+
+  - name: copy .tmuxline.conf file
+    copy:
+      src: dotfiles/.tmuxline.conf
+      dest: /root/.tmuxline.conf
+      owner: root
+      group: root
+
+  - name: copy .zsh_plugins.txt file
+    copy:
+      src: dotfiles/.zsh_plugins.txt
+      dest: /root/.zsh_plugins.txt
+      owner: root
+      group: root
+
+  - name: copy .vimrc file
+    copy:
+      src: dotfiles/.vimrc
+      dest: /root/.vimrc
+      owner: root
+      group: root
+
+  - name: copy .aliases file
+    copy:
+      src: dotfiles/.aliases
+      dest: /root/.aliases
+      owner: root
+      group: root
+
 
   - name: add ansible user
     user:
