@@ -30,6 +30,7 @@
         - bat
         - ripgrep
         - zsh
+        - nodejs
         - zoxide
         - fzf
         - xclip
