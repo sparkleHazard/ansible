@@ -169,6 +169,16 @@
       path: /etc/sudoers.d
       state: directory
 
+  - name: Creates zsh directory alan1
+    file:
+      path: /home/alan1/.cache/zsh/
+      state: directory
+
+  - name: Creates zsh directory for root
+    file:
+      path: /root/.cache/zsh/
+      state: directory
+
   - name: Creates zsh history file alan1
     file:
       path: /home/alan1/.cache/zsh/history
