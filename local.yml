@@ -2,7 +2,7 @@
 # tasks to complete before running roles
 - hosts: all
   tags: always
-    #connection: local
+  connection: local
   become: true
   pre_tasks:
     - name: pre-run | update package cache (arch)
