@@ -69,7 +69,7 @@
       clone: yes
       update: yes
 
-  - name: Clone antidote repository for alan1
+  - name: Clone antidote repository for root
     git:
       repo: https://github.com/mattmc3/antidote.git
       dest: /root/.antidote
