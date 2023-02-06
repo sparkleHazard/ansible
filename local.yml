@@ -169,10 +169,15 @@
       path: /etc/sudoers.d
       state: directory
 
-  - name: Creates zsh history file
+  - name: Creates zsh history file alan1
     file:
       path: /home/alan1/.cache/zsh/history
-      state: directory
+      state: touch
+
+  - name: Creates zsh history file for root
+    file:
+      path: /root/.cache/zsh/history
+      state: touch
 
   - name: set up sudo for alan1
     copy:
