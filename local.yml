@@ -128,11 +128,15 @@
       owner: root
       group: root
 
-
   - name: add ansible user
     user:
       name: ansible
       system: yes
+
+  - name: Creates sudoers.d directory
+    file:
+      path: /etc/sudoers.d
+      state: directory
 
   - name: set up sudo for alan1
     copy:
