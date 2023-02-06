@@ -37,12 +37,25 @@
         - git
         - qemu-guest-agent
         - awscli
+        - zsh
 
   - name: add alan1 user
     tags: always
     user:
       name: alan1
       groups: root
+
+  - name: change user shell to zsh
+    become: yes
+    user:
+      name: alan1
+      shell: /bin/zsh
+
+  - name: change user shell to zsh
+    become: yes
+    user:
+      name: root
+      shell: /bin/zsh
 
   - name: copy .zshrc file
     copy:
