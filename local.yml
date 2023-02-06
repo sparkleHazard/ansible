@@ -58,15 +58,18 @@
       shell: /bin/zsh
 
   - name: Clone antidote repository for alan1
-    ansible.builtin.git:
+    git:
       repo: https://github.com/mattmc3/antidote.git
       dest: /home/alan1/.antidote
+      clone: yes
+      update: yes
 
   - name: Clone antidote repository for alan1
-    ansible.builtin.git:
+    git:
       repo: https://github.com/mattmc3/antidote.git
       dest: /root/.antidote
-      become: yes
+      clone: yes
+      update: yes
 
   - name: copy .zshrc file
     copy:
