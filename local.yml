@@ -42,7 +42,7 @@
     tags: always
     user:
       name: alan1
-      groups: alan1
+      groups: root
 
   - name: copy .zshrc file
     copy:
