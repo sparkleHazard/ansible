@@ -37,7 +37,6 @@
         - git
         - qemu-guest-agent
         - awscli
-        - zsh
 
   - name: add alan1 user
     tags: always
@@ -174,6 +173,8 @@
     file:
       path: /home/alan1/.cache/zsh/
       state: directory
+      user: alan1
+      groups: alan1
 
   - name: Creates zsh directory for root
     file:
@@ -184,6 +185,8 @@
     file:
       path: /home/alan1/.cache/zsh/history
       state: touch
+      user: alan1
+      groups: alan1
 
   - name: Creates zsh history file for root
     file:
