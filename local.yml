@@ -23,3 +23,46 @@
         - git
         - qemu-guest-agent
         - awscli
+
+    - name: copy .zshrc file
+      copy:
+        src: dotfiles/.zshrc
+        dest: /home/alan1/.zshrc
+        owner: alan1
+        group: alan1
+
+    - name: copy .tmux.conf file
+      copy:
+        src: dotfiles/.tmux.conf
+        dest: /home/alan1/.tmux.conf
+        owner: alan1
+        group: alan1
+
+    - name: copy .tmuxline.conf file
+      copy:
+        src: dotfiles/.tmuxline.conf
+        dest: /home/alan1/.tmuxline.conf
+        owner: alan1
+        group: alan1
+
+    - name: copy .zsh_plugins.txt file
+      copy:
+        src: dotfiles/.zsh_plugins.txt
+        dest: /home/alan1/.zsh_plugins.txt
+        owner: alan1
+        group: alan1
+
+    - name: copy .vimrc file
+      copy:
+        src: dotfiles/.vimrc
+        dest: /home/alan1/.vimrc
+        owner: alan1
+        group: alan1
+
+    - name: copy .aliases file
+      copy:
+        src: dotfiles/.aliases
+        dest: /home/alan1/.aliases
+        owner: alan1
+        group: alan1
+
