@@ -66,3 +66,24 @@
       owner: alan1
       group: alan1
 
+  - name: add ansible user
+    user:
+      name: ansible
+      system: yes
+
+  - name: set up sudo for alan1
+    copy:
+      src: sudoers/alan1
+      dest: /etc/sudoers.d/alan1
+      owner: root
+      group: root
+      mode: 0440
+
+  - name: set up sudo for ansible user
+    copy:
+      src: sudoers/ansible
+      dest: /etc/sudoers.d/ansible
+      owner: root
+      group: root
+      mode: 0440
+
