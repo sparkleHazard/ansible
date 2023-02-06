@@ -59,7 +59,8 @@
 
   - name: install starship
     ansible.builtin.shell:
-      cmd: curl -sS https://starship.rs/install.sh | bash -s -- -y
+      cmd: curl -sS https://starship.rs/install.sh | sh -s -- -y
+      become: yes
 
   - name: Clone antidote repository for alan1
     git:
