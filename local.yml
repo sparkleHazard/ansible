@@ -1,6 +1,6 @@
 ---
 # tasks to complete before running roles
-- hosts: dev
+- hosts: localhost
   tags: always
   connection: local
   become: true
