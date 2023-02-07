@@ -68,12 +68,12 @@
 
   - name: install starship
     ansible.builtin.shell:
-      command: 'curl -sS https://starship.rs/install.sh | sh -s -- -y'
+      cmd: 'curl -sS https://starship.rs/install.sh | sh -s -- -y'
       when: starship_installed.rc != 0
 
   - name: install nvm
     ansible.builtin.shell:
-      command: 'curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash'
+      cmd: 'curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash'
       when: nvm_installed.rc != 0
 
   - name: Clone antidote repository for alan1
