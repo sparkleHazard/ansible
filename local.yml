@@ -1,6 +1,6 @@
 ---
 # tasks to complete before running roles
-- hosts: dev
+- hosts: pop-os
   tags: always
     #connection: local
   become: true
