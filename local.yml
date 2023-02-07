@@ -64,7 +64,7 @@
 
   - name: check that nvm is already installed
     ansible.builtin.shell:
-      command: 'which nvm'
+      cmd: 'which nvm'
     register: nvm
     ignore_errors: yes
 
