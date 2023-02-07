@@ -57,23 +57,23 @@
       shell: /bin/zsh
 
   - name: check that starship is already installed
-    cmd: 'which starship'
+    command: 'which starship'
     register: starship_installed
     ignore_errors: yes
 
   - name: check that nvm is already installed
-    cmd: 'which nvm'
+    command: 'which nvm'
     register: nvm
     ignore_errors: yes
 
   - name: install starship
     ansible.builtin.shell:
-      cmd: 'curl -sS https://starship.rs/install.sh | sh -s -- -y'
+      command: 'curl -sS https://starship.rs/install.sh | sh -s -- -y'
       when: starship_installed.rc != 0
 
   - name: install nvm
     ansible.builtin.shell:
-      cmd: 'curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash'
+      command: 'curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash'
       when: nvm_installed.rc != 0
 
   - name: Clone antidote repository for alan1
