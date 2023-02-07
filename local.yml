@@ -62,11 +62,11 @@
     register: starship_installed
     ignore_errors: yes
 
-  - name: check that nvm is already installed
-    ansible.builtin.shell:
-      cmd: 'nvm'
-    register: nvm_installed
-    ignore_errors: yes
+      #  - name: check that nvm is already installed
+      #    ansible.builtin.shell:
+      #      cmd: 'nvm'
+      #    register: nvm_installed
+      #    ignore_errors: yes
 
   - name: install starship
     ansible.builtin.shell:
