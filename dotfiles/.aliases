@@ -3,3 +3,4 @@ alias cat='batcat'
 alias fzf="fzf --preview 'batcat --color=always --style=numbers --line-range=:500 {}'"
 alias dotgit='git --git-dir=$HOME/dotfiles/ --work-tree=$HOME'
 alias cd=z
+alias python=python3
