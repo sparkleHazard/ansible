@@ -42,8 +42,10 @@
       name:
         - fd
         - npm
+        - man-db
+        - btop
         - cron
-    when: ansible_distribution =="Archlinux"
+    when: ansible_distribution == "Archlinux"
 
   - name: install Debian/Ubuntu specific packages
     package:
