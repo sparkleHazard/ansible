@@ -39,12 +39,14 @@
 
   - name: install Arch specific packages
     package:
-      - fd
+      name:
+        - fd
     when: ansible_distribution =="Archlinux"
 
   - name: install Debian/Ubuntu specific packages
     package:
-      - fd-find
+      name:
+        - fd-find
     when: ansible_distribution in ["Debian", "Ubuntu", "Pop!_OS"]
 
   - name: add alan1 user
