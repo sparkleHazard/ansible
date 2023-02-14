@@ -42,6 +42,7 @@
       name:
         - fd
         - npm
+        - cron
     when: ansible_distribution =="Archlinux"
 
   - name: install Debian/Ubuntu specific packages
