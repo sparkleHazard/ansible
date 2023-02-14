@@ -24,7 +24,6 @@
         - tmux
         - htop
         - vim
-        - fd-find
         - rsync
         - exa
         - bat
@@ -37,6 +36,16 @@
         - git
         - qemu-guest-agent
         - sudo
+
+  - name: install Arch specific packages
+    package:
+      - fd
+    when: ansible_distribution =="Archlinux"
+
+  - name: install Debian/Ubuntu specific packages
+    package:
+      - fd-find
+    when: ansible_distribution in ["Debian", "Ubuntu", "Pop!_OS"]
 
   - name: add alan1 user
     tags: always
