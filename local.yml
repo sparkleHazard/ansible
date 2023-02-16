@@ -36,6 +36,7 @@
         - git
         - qemu-guest-agent
         - sudo
+    when: ansible_architecture not in ["armv6l", "armv7l"]
 
   - name: install Arch specific packages
     package:
