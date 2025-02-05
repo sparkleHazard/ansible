@@ -7,7 +7,7 @@
     - common
 
 - name: Apply role-specific configuration
-  hosts: localhost
+  hosts: keyserver
   gather_facts: yes
   tasks:
     - include_role:
