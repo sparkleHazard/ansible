@@ -7,7 +7,7 @@
     - common
 
 - name: Apply role-specific configuration
-  hosts: keyserver.swadden.co.uk
+  hosts: localhost
   gather_facts: yes
   tasks:
     - include_role:
@@ -16,3 +16,10 @@
     - include_role:
         name: webserver
       when: host_role | default('base') == "webserver"
+
+- name: Debug host_role variable
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+    - debug:
+        msg: "host_role is {{ host_role | default('base') }}"
