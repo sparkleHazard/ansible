@@ -1,9 +1,13 @@
 #!/bin/bash
-# bootstrap.sh - OS-agnostic bootstrapping script with role arguments.
+# bootstrap.sh - OS-agnostic bootstrapping script with role arguments,
+# including retries, logging, keyserver-specific key generation, and installing sudo.
 #
-# This script installs prerequisites (Nix, Ansible, Home Manager),
-# fetches an approved SSH key from a local server, and then runs
-# ansible-pull with a role specified by the command-line argument.
+# This script installs prerequisites (curl, Nix, Ansible, Home Manager, and sudo),
+# fetches an approved SSH public key from a local key server (unless this machine is the keyserver),
+# securely downloads the GitHub SSH private key (unless this machine is the keyserver),
+# and if the role is "keyserver" it generates an ECDSA key pair and prints the public key.
+# It then pauses to allow you to upload the public key to GitHub before continuing,
+# and finally runs ansible-pull with the specified role.
 #
 # Usage (via curl pipe to bash):
 #   curl -sSL https://provisioning-server.local/bootstrap.sh | bash -s -- --role=webserver
@@ -13,12 +17,34 @@
 set -euo pipefail
 
 #############################
-# Argument Parsing
+# Logging & Retry Functions
 #############################
-# Default role is "base" if not provided.
-ROLE="base"
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
 
-# Parse arguments (e.g. --role=webserver)
+retry_command() {
+  local max_retries=$1
+  shift
+  local sleep_seconds=$1
+  shift
+  local count=0
+  until "$@"; do
+    count=$((count + 1))
+    if [ "$count" -ge "$max_retries" ]; then
+      log "Command failed after $count attempts: $*"
+      return 1
+    fi
+    log "Command failed, retrying in $sleep_seconds seconds... (Attempt $((count + 1))/$max_retries)"
+    sleep "$sleep_seconds"
+  done
+  return 0
+}
+
+#############################
+# Step 1: Argument Parsing
+#############################
+ROLE="base"
 while [[ "$#" -gt 0 ]]; do
   case $1 in
   --role=*)
@@ -35,74 +61,151 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   esac
 done
-
-echo "Bootstrapping role: ${ROLE}"
+log "Bootstrapping role: ${ROLE}"
 
 #############################
-# Step 1: OS Detection
+# Step 2: OS Detection
 #############################
 OS="$(uname -s)"
-echo "Detected OS: ${OS}"
+log "Detected OS: ${OS}"
 
 #############################
-# Step 2: Install Nix (if needed)
+# Step 3: Ensure sudo is installed (if running as root)
+#############################
+if [ "$(id -u)" -eq 0 ]; then
+  log "Running as root."
+  if ! command -v sudo >/dev/null 2>&1; then
+    log "sudo is not installed. Installing sudo..."
+    case "$OS" in
+    Linux)
+      if command -v apt-get >/dev/null 2>&1; then
+        apt-get update && apt-get install -y sudo
+      elif command -v yum >/dev/null 2>&1; then
+        yum install -y sudo
+      elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y sudo
+      else
+        log "Unable to determine package manager to install sudo."
+        exit 1
+      fi
+      ;;
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        brew install sudo
+      else
+        log "Homebrew not found on macOS. Please install sudo manually."
+        exit 1
+      fi
+      ;;
+    *)
+      log "OS $OS not explicitly supported for sudo installation. Please install sudo manually."
+      exit 1
+      ;;
+    esac
+  else
+    log "sudo is already installed."
+  fi
+else
+  log "Running as non-root user."
+  if ! command -v sudo >/dev/null 2>&1; then
+    log "Error: sudo is not installed and you are not root. Please install sudo or run as root."
+    exit 1
+  fi
+fi
+
+#############################
+# Step 4: Ensure curl is installed (OS-agnostic)
+#############################
+if ! command -v curl >/dev/null 2>&1; then
+  log "curl is not installed. Installing curl..."
+  case "$OS" in
+  Linux)
+    if command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update && sudo apt-get install -y curl
+    elif command -v yum >/dev/null 2>&1; then
+      sudo yum install -y curl
+    elif command -v dnf >/dev/null 2>&1; then
+      sudo dnf install -y curl
+    else
+      log "Unable to determine package manager. Please install curl manually."
+      exit 1
+    fi
+    ;;
+  Darwin)
+    if command -v brew >/dev/null 2>&1; then
+      brew install curl
+    else
+      log "Homebrew not found on macOS. Please install Homebrew and then curl."
+      exit 1
+    fi
+    ;;
+  *)
+    log "Unsupported OS for automatic curl installation. Please install curl manually."
+    exit 1
+    ;;
+  esac
+else
+  log "curl is already installed."
+fi
+
+#############################
+# Step 5: Install Nix (if needed)
 #############################
 if ! command -v nix >/dev/null 2>&1; then
-  echo "Nix is not installed. Installing Nix..."
+  log "Nix is not installed. Installing Nix..."
   curl -L https://nixos.org/nix/install | sh
-  # Source the Nix profile to update environment variables.
   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   fi
 else
-  echo "Nix is already installed."
+  log "Nix is already installed."
 fi
 
 #############################
-# Step 3: Install Ansible (OS-agnostic)
+# Step 6: Install Ansible (OS-agnostic)
 #############################
 install_ansible() {
   if command -v ansible-playbook >/dev/null 2>&1; then
-    echo "Ansible is already installed."
+    log "Ansible is already installed."
     return
   fi
-
-  echo "Ansible not found. Installing..."
+  log "Ansible not found. Installing..."
   case "$OS" in
   Linux)
-    if command -v lsb_release >/dev/null 2>&1; then
-      DISTRO=$(lsb_release -is)
-      echo "Detected Linux distro: ${DISTRO}"
-      case "$DISTRO" in
-      Ubuntu | Debian)
-        sudo apt-get update && sudo apt-get install -y ansible
-        ;;
-      Fedora)
-        sudo dnf install -y ansible
-        ;;
-      CentOS | RedHat)
-        sudo yum install -y epel-release && sudo yum install -y ansible
-        ;;
-      *)
-        echo "Unknown Linux distro ($DISTRO). Falling back to pip installation..."
-        pip install --user ansible
-        ;;
-      esac
+    if [ -f /etc/os-release ]; then
+      . /etc/os-release
+      DISTRO="${ID:-Unknown}"
     else
-      echo "lsb_release not available. Attempting pip installation..."
-      pip install --user ansible
+      DISTRO="$(uname -s)"
     fi
+    DISTRO=$(echo "$DISTRO" | tr '[:lower:]' '[:upper:]')
+    log "Detected Linux distro: ${DISTRO}"
+    case "$DISTRO" in
+    UBUNTU | DEBIAN)
+      sudo apt-get update && sudo apt-get install -y ansible
+      ;;
+    FEDORA)
+      sudo dnf install -y ansible
+      ;;
+    CENTOS | REDHAT)
+      sudo yum install -y epel-release && sudo yum install -y ansible
+      ;;
+    *)
+      log "Unknown Linux distro ($DISTRO). Falling back to pip installation..."
+      pip install --user ansible
+      ;;
+    esac
     ;;
   Darwin)
     if command -v brew >/dev/null 2>&1; then
       brew install ansible
     else
-      echo "Homebrew not found on macOS. Please install Homebrew first."
+      log "Homebrew not found on macOS. Please install Homebrew first."
       exit 1
     fi
     ;;
   *)
-    echo "OS $OS is not explicitly supported. Attempting pip installation..."
+    log "OS $OS is not explicitly supported. Attempting pip installation..."
     pip install --user ansible
     ;;
   esac
@@ -110,57 +213,109 @@ install_ansible() {
 install_ansible
 
 #############################
-# Step 4: Install Home Manager via Nix (if needed)
+# Step 7: Install Home Manager via Nix (if needed)
 #############################
 if ! command -v home-manager >/dev/null 2>&1; then
-  echo "Home Manager not found. Installing Home Manager..."
+  log "Home Manager not found. Installing Home Manager..."
   nix profile install nixpkgs#home-manager
 else
-  echo "Home Manager is already installed."
+  log "Home Manager is already installed."
 fi
-
-echo "Home Manager version: $(home-manager --version)"
+log "Home Manager version: $(home-manager --version)"
 
 #############################
-# Step 5: Fetch Approved SSH Key from Local Server
+# Step 8: Fetch Approved SSH Public Key (if not keyserver)
 #############################
-LOCAL_KEY_URL="http://localserver.example.com/approved_key.pub"
-echo "Fetching approved SSH key from ${LOCAL_KEY_URL}..."
-mkdir -p "${HOME}/.ssh"
-chmod 700 "${HOME}/.ssh"
+if [ "$ROLE" != "keyserver" ]; then
+  LOCAL_KEY_URL="http://localserver.example.com/approved_key.pub"
+  log "Fetching approved SSH public key from ${LOCAL_KEY_URL}..."
+  mkdir -p "${HOME}/.ssh"
+  chmod 700 "${HOME}/.ssh"
+  KEY_DEST="${HOME}/.ssh/authorized_keys"
 
-KEY_DEST="${HOME}/.ssh/authorized_keys"
-curl -sSf "${LOCAL_KEY_URL}" -o /tmp/approved_key.pub
-
-if [ -f "${KEY_DEST}" ]; then
-  if grep -qFf /tmp/approved_key.pub "${KEY_DEST}"; then
-    echo "Approved SSH key already present in authorized_keys."
-  else
-    cat /tmp/approved_key.pub >>"${KEY_DEST}"
-    echo "Approved SSH key added to authorized_keys."
+  retry_command 5 10 curl -sSf "${LOCAL_KEY_URL}" -o /tmp/approved_key.pub
+  if [ $? -ne 0 ]; then
+    log "Error: Unable to fetch approved SSH key from ${LOCAL_KEY_URL} after retries."
+    exit 1
   fi
+
+  if ! grep -qFf /tmp/approved_key.pub "${KEY_DEST}" 2>/dev/null; then
+    cat /tmp/approved_key.pub >>"${KEY_DEST}"
+    log "Approved SSH public key added to authorized_keys."
+  else
+    log "Approved SSH public key already present in authorized_keys."
+  fi
+  chmod 600 "${KEY_DEST}"
 else
-  cat /tmp/approved_key.pub >"${KEY_DEST}"
-  echo "authorized_keys created and approved SSH key added."
+  log "Role is 'keyserver'. Skipping SSH public key fetch."
 fi
-chmod 600 "${KEY_DEST}"
 
 #############################
-# Step 6: Run ansible-pull to Provision the System
+# Step 9: Fetch GitHub SSH Private Key (if not keyserver)
 #############################
-# Define your bootstrap repository URL and playbook path.
-BOOTSTRAP_REPO="git@github.com:SparkleHazard/bootstrap.git"
-PLAYBOOK_PATH="ansible/playbooks/site.yml"
+if [ "$ROLE" != "keyserver" ]; then
+  GITHUB_KEY_URL="https://secure-internal.example.com/github_key"
+  log "Fetching GitHub SSH private key from ${GITHUB_KEY_URL}..."
+  mkdir -p "${HOME}/.ssh"
+  chmod 700 "${HOME}/.ssh"
+  PRIVATE_KEY_DEST="${HOME}/.ssh/id_rsa_github"
 
-# Define the private key if needed (adjust the path accordingly).
-PRIVATE_KEY="/path/to/your/private/key"
+  retry_command 5 10 curl -sSf "${GITHUB_KEY_URL}" -o /tmp/github_key
+  if [ $? -ne 0 ]; then
+    log "Error: Unable to fetch GitHub SSH private key from ${GITHUB_KEY_URL} after retries."
+    exit 1
+  fi
 
-echo "Running ansible-pull for role '${ROLE}'..."
+  if [ -f "${PRIVATE_KEY_DEST}" ]; then
+    if cmp -s /tmp/github_key "${PRIVATE_KEY_DEST}"; then
+      log "GitHub SSH private key is already up-to-date."
+    else
+      cp /tmp/github_key "${PRIVATE_KEY_DEST}"
+      log "GitHub SSH private key updated at ${PRIVATE_KEY_DEST}."
+    fi
+  else
+    cp /tmp/github_key "${PRIVATE_KEY_DEST}"
+    log "GitHub SSH private key installed at ${PRIVATE_KEY_DEST}."
+  fi
+  chmod 600 "${PRIVATE_KEY_DEST}"
+else
+  log "Role is 'keyserver'. Skipping GitHub SSH private key fetch."
+fi
+
+#############################
+# Step 10: Keyserver-Specific: Generate ECDSA SSH Key Pair and Pause
+#############################
+if [ "$ROLE" == "keyserver" ]; then
+  log "Role is keyserver: Generating ECDSA SSH key pair..."
+  mkdir -p "${HOME}/.ssh"
+  chmod 700 "${HOME}/.ssh"
+  KEY_PATH="${HOME}/.ssh/id_ecdsa_keyserver"
+  if [ ! -f "${KEY_PATH}" ]; then
+    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -q
+    log "ECDSA key pair generated at ${KEY_PATH}."
+  else
+    log "ECDSA key pair already exists at ${KEY_PATH}."
+  fi
+
+  PUBLIC_KEY=$(cat "${KEY_PATH}.pub")
+  log "Public key for GitHub (upload this key to GitHub):"
+  echo "${PUBLIC_KEY}"
+
+  echo "Press Enter to continue after you have added the public key to GitHub..."
+  read -r
+fi
+
+#############################
+# Step 11: Run ansible-pull to Provision the System
+#############################
+BOOTSTRAP_REPO="git@github.com:yourusername/bootstrap.git"
+ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_rsa_github"
+
+log "Running ansible-pull for role '${ROLE}'..."
 ansible-pull -U "${BOOTSTRAP_REPO}" \
   -i "localhost," \
-  --playbook "${PLAYBOOK_PATH}" \
   -e "host_role=${ROLE}" \
-  --private-key "${PRIVATE_KEY}" \
+  --private-key "${ANSIBLE_PRIVATE_KEY}" \
   --accept-host-key
 
-echo "Bootstrapping complete."
+log "Bootstrapping complete."

@@ -1,0 +1,84 @@
+---
+# Keyserver Role: Provision the keyserver machine to generate its own ECDSA SSH key pair
+# and serve the private key securely via Nginx.
+# It also prints the public key so that you can add it to GitHub.
+
+- name: Ensure .ssh directory exists for root
+  file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Check if ECDSA key exists
+  stat:
+    path: /root/.ssh/id_ecdsa_keyserver
+  register: key_stat
+
+- name: Generate ECDSA SSH key pair for keyserver (if not exists)
+  command: ssh-keygen -t ecdsa -b 521 -f /root/.ssh/id_ecdsa_keyserver -N ""
+  when: not key_stat.stat.exists
+
+- name: Read generated public key
+  command: cat /root/.ssh/id_ecdsa_keyserver.pub
+  register: public_key_output
+
+- name: Print public key (copy this to GitHub as your deploy key)
+  debug:
+    msg: "Public key for GitHub: {{ public_key_output.stdout }}"
+
+- name: Ensure directory for serving keys exists
+  file:
+    path: /var/www/keys
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Copy generated SSH private key to serving directory
+  copy:
+    src: /root/.ssh/id_ecdsa_keyserver
+    dest: /var/www/keys/id_ecdsa_keyserver
+    owner: root
+    group: root
+    mode: '0400'
+
+- name: Copy generated SSH public key to serving directory
+  copy:
+    src: /root/.ssh/id_ecdsa_keyserver.pub
+    dest: /var/www/keys/id_ecdsa_keyserver.pub
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install Nginx on Debian/Ubuntu
+  package:
+    name: nginx
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install Nginx on RedHat/CentOS/Fedora
+  package:
+    name: nginx
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Configure Nginx to serve the key
+  template:
+    src: keyserver_nginx.conf.j2
+    dest: /etc/nginx/conf.d/keyserver.conf
+    mode: '0644'
+  notify: Reload Nginx
+
+- name: Ensure Nginx is running and enabled
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+# Handlers
+- name: Reload Nginx
+  service:
+    name: nginx
+    state: reloaded
