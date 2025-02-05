@@ -7,7 +7,7 @@
     - common
 
 - name: Apply role-specific configuration
-  hosts: keyserver
+  hosts: keyserver.swadden.co.uk
   gather_facts: yes
   tasks:
     - include_role:
