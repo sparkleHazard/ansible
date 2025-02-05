@@ -391,6 +391,6 @@ ansible-pull -U "${BOOTSTRAP_REPO}" \
   --extra-vars "host_role=${ROLE}" \
   --private-key "${ANSIBLE_PRIVATE_KEY}" \
   --accept-host-key \
-  site.yml
+  ansible/site.yml
 
 log "Bootstrapping complete."
