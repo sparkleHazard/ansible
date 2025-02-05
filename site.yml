@@ -1,2 +1,26 @@
 ---
-- import_playbook: ansible/playbooks/site.yml
+- name: Provision Base and Common Configuration
+  hosts: localhost
+  gather_facts: yes
+  roles:
+    - base
+    - common
+
+- name: Provision Role-Specific Configuration
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+    - name: Include keyserver role if host_role is 'keyserver'
+      include_role:
+        name: keyserver
+      when: host_role | default('base') == "keyserver"
+
+    - name: Include webserver role if host_role is 'webserver'
+      include_role:
+        name: webserver
+      when: host_role | default('base') == "webserver"
+
+    - name: Include database role if host_role is 'database'
+      include_role:
+        name: database
+      when: host_role | default('base') == "database"
