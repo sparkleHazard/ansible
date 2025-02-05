@@ -1,10 +1,13 @@
 #!/bin/bash
 # bootstrap.sh - OS-agnostic bootstrapping script with role arguments,
-# including retries, logging, keyserver-specific key generation, and installing sudo.
+# including retries, logging, keyserver-specific key generation, sudo and curl installation,
+# and setup of Nix multi-user mode.
 #
-# This script installs prerequisites (curl, Nix, Ansible, Home Manager, and sudo),
-# fetches an approved SSH public key from a local key server (unless this machine is the keyserver),
-# securely downloads the GitHub SSH private key (unless this machine is the keyserver),
+# This script installs prerequisites (sudo, curl, Nix, Git, Ansible, Home Manager),
+# sets up Nix multi-user mode (creates the nixbld group and build users, starts nix-daemon,
+# exports NIX_REMOTE=daemon),
+# fetches an approved SSH public key from a local key server (unless the role is "keyserver"),
+# securely downloads the GitHub SSH private key (unless the role is "keyserver"),
 # and if the role is "keyserver" it generates an ECDSA key pair and prints the public key.
 # It then pauses to allow you to upload the public key to GitHub before continuing,
 # and finally runs ansible-pull with the specified role.
@@ -149,6 +152,41 @@ else
 fi
 
 #############################
+# Step 4.5: Ensure Git is installed (OS-agnostic)
+#############################
+if ! command -v git >/dev/null 2>&1; then
+  log "Git is not installed. Installing Git..."
+  case "$OS" in
+  Linux)
+    if command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update && sudo apt-get install -y git
+    elif command -v yum >/dev/null 2>&1; then
+      sudo yum install -y git
+    elif command -v dnf >/dev/null 2>&1; then
+      sudo dnf install -y git
+    else
+      log "Unable to determine package manager for Git installation on Linux. Please install Git manually."
+      exit 1
+    fi
+    ;;
+  Darwin)
+    if command -v brew >/dev/null 2>&1; then
+      brew install git
+    else
+      log "Homebrew not found on macOS. Please install Git manually or install Homebrew first."
+      exit 1
+    fi
+    ;;
+  *)
+    log "Unsupported OS for automatic Git installation. Please install Git manually."
+    exit 1
+    ;;
+  esac
+else
+  log "Git is already installed."
+fi
+
+#############################
 # Step 5: Install Nix (if needed)
 #############################
 if ! command -v nix >/dev/null 2>&1; then
@@ -160,6 +198,41 @@ if ! command -v nix >/dev/null 2>&1; then
 else
   log "Nix is already installed."
 fi
+
+#############################
+# Step 5.5: Setup Nix Multi-User Environment
+#############################
+# Create the nixbld group if it doesn't exist.
+if ! getent group nixbld >/dev/null; then
+  log "Creating group 'nixbld'..."
+  groupadd -r nixbld
+fi
+
+# Create 10 build users (nixbld1 to nixbld10) if they are not already present,
+# and add them as explicit members of the nixbld group.
+for n in $(seq 1 10); do
+  USER="nixbld$n"
+  if ! id "$USER" >/dev/null 2>&1; then
+    log "Creating build user $USER..."
+    useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USER"
+  else
+    log "Build user $USER already exists."
+  fi
+  # Ensure the user is explicitly listed as a member of nixbld.
+  usermod -a -G nixbld "$USER"
+done
+log "Nix build users group (nixbld) membership: $(getent group nixbld)"
+
+# Start the nix-daemon if not already running.
+if ! pgrep -x nix-daemon >/dev/null; then
+  log "Starting nix-daemon..."
+  nix-daemon &
+  sleep 5 # Allow some time for the daemon to start.
+fi
+
+# Export NIX_REMOTE for unprivileged users.
+export NIX_REMOTE=daemon
+log "Exported NIX_REMOTE=daemon"
 
 #############################
 # Step 6: Install Ansible (OS-agnostic)
@@ -289,7 +362,7 @@ if [ "$ROLE" == "keyserver" ]; then
   log "Role is keyserver: Generating ECDSA SSH key pair..."
   mkdir -p "${HOME}/.ssh"
   chmod 700 "${HOME}/.ssh"
-  KEY_PATH="${HOME}/.ssh/id_ecdsa_keyserver"
+  KEY_PATH="${HOME}/.ssh/id_ecdsa_github"
   if [ ! -f "${KEY_PATH}" ]; then
     ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -q
     log "ECDSA key pair generated at ${KEY_PATH}."
@@ -308,13 +381,14 @@ fi
 #############################
 # Step 11: Run ansible-pull to Provision the System
 #############################
-BOOTSTRAP_REPO="git@github.com:yourusername/bootstrap.git"
-ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_rsa_github"
+BOOTSTRAP_REPO="git@github.com:sparkleHazard/bootstrap.git"
+PLAYBOOK_PATH="ansible/playbooks/site.yml"
+ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_github"
 
 log "Running ansible-pull for role '${ROLE}'..."
 ansible-pull -U "${BOOTSTRAP_REPO}" \
   -i "localhost," \
-  -e "host_role=${ROLE}" \
+  --extra-vars "host_role=${ROLE}" \
   --private-key "${ANSIBLE_PRIVATE_KEY}" \
   --accept-host-key
 
