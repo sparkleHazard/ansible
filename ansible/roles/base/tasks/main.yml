@@ -1,0 +1,44 @@
+---
+# ansible/roles/base/tasks/main.yml
+
+# Task group for systems using Homebrew (macOS and Linux)
+- name: Check if Homebrew is installed
+  shell: "command -v brew"
+  register: brew_check
+  ignore_errors: yes
+  changed_when: false
+  when: ansible_os_family in ["Darwin", "Linux"]
+
+- name: Install Homebrew if not present (macOS or Linux)
+  shell: |
+    echo "Homebrew not found. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  args:
+    executable: /bin/bash
+  when:
+    - ansible_os_family in ["Darwin", "Linux"]
+    - brew_check.rc != 0
+
+- name: Update Homebrew
+  shell: brew update
+  args:
+    executable: /bin/bash
+  when: ansible_os_family in ["Darwin", "Linux"]
+
+- name: Install common packages using Homebrew
+  shell: |
+    brew install curl git vim neovim htop btop nvtop mise
+  args:
+    executable: /bin/bash
+  when: ansible_os_family in ["Darwin", "Linux"]
+
+# Fallback for systems that are not Darwin or Linux (if needed)
+- name: Update system packages on non-Homebrew systems
+  package:
+    name:
+      - curl
+      - git
+      - vim
+      - htop
+    state: latest
+  when: ansible_os_family not in ["Darwin", "Linux"]

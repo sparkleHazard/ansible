@@ -1,0 +1,3 @@
+[submodule "ansible/roles/common/files/dotfiles"]
+	path = ansible/roles/common/files/dotfiles
+	url = git@github.com:SparkleHazard/dotfiles.git

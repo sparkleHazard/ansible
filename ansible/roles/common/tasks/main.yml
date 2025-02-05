@@ -1,0 +1,24 @@
+---
+# Update the dotfiles submodule to get the latest changes.
+- name: Update dotfiles submodule
+  command: git submodule update --remote --merge
+  args:
+    chdir: "{{ role_path }}/files/dotfiles"
+  when: dotfiles_update | default(true)
+
+# Ensure the target directories exist
+- name: Ensure ~/.config directory exists
+  file:
+    path: "{{ ansible_env.HOME }}/.config"
+    state: directory
+    mode: '0755'
+
+# Copy dotfiles using rsync so that local changes can persist if desired.
+- name: Rsync dotfiles to home directory
+  synchronize:
+    src: "{{ role_path }}/files/dotfiles/"
+    dest: "{{ ansible_env.HOME }}/"
+    archive: yes
+    delete: no
+    # rsync_opts:
+    #   - "--update"
