@@ -1,6 +1,26 @@
 ---
 # ansible/roles/base/tasks/main.yml
 
+# Ensure rsync is installed for different operating systems.
+
+- name: Ensure rsync is installed on Debian/Ubuntu
+  package:
+    name: rsync
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Ensure rsync is installed on RedHat/CentOS/Fedora
+  package:
+    name: rsync
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Ensure rsync is installed on macOS using Homebrew
+  community.general.homebrew:
+    name: rsync
+    state: present
+  when: ansible_os_family == "Darwin"
+
 # Task group for systems using Homebrew (macOS and Linux)
 - name: Check if Homebrew is installed
   shell: "command -v brew"
