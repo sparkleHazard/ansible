@@ -85,6 +85,7 @@
   when: sudo_user != ""
 
 - name: Run 'mise install' command
-  shell: mise install
+  shell: /home/linuxbrew/.linuxbrew/bin/mise install
   register: mise_use_result
   changed_when: false
+  when: host_role | default('base') != "keyserver"

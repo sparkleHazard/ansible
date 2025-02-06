@@ -1,5 +1,5 @@
 ---
-- name: Apply base and common configuration
+- name: Apply base, common and homebrew configuration
   hosts: localhost
   gather_facts: yes
   roles:

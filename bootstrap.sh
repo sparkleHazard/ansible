@@ -2,16 +2,19 @@
 # bootstrap.sh - OS-agnostic bootstrapping script with role arguments,
 # including retries, logging, dedicated brewuser creation for Homebrew installation,
 # conditional multi-user Nix setup, installation of GitHub CLI,
-# key management via GitHub CLI, and automatic ansible-pull.
+# key management via GitHub CLI (using gh API commands), and automatic ansible-pull.
 #
 # This script installs prerequisites (sudo, curl, Git, rsync, Nix),
 # sets up Nix multi-user mode (if running as root),
 # installs Nix (multi-user if root, single-user otherwise),
 # and if running as root, creates a dedicated brewuser to install Homebrew.
 #
-# It then installs GitHub CLI in an OS-agnostic manner,
-# fetches the GitHub SSH private key via rsync (if role is not keyserver)
-# or, if role is keyserver, generates an ECDSA key pair and compares it with GitHub using gh.
+# It then installs GitHub CLI (gh) in an OS-agnostic manner,
+# ensures the ~/.ssh directory exists,
+# and for the keyserver role it generates an ECDSA key pair and compares the local public key
+# with the one registered on GitHub using gh API commands. If they differ, it updates GitHub.
+#
+# Before running gh API commands, the script prompts for a GitHub token if gh is not authenticated.
 #
 # Finally, it runs ansible-pull (using the appropriate SSH key) with the specified role.
 #
@@ -111,7 +114,7 @@ progress "Verifying .ssh directory"
 if [ -d "${HOME}/.ssh" ]; then
   log ".ssh directory exists."
 else
-  log ".ssh directory not found. Creating .ssh directory..."
+  log ".ssh directory not found. Creating ~/.ssh directory..."
   mkdir -p "${HOME}/.ssh"
   chmod 700 "${HOME}/.ssh"
 fi
@@ -275,87 +278,144 @@ fi
 done_progress
 
 #############################
-# Step 5: Install Nix (if needed)
+# Step X: Ensure jq is installed (OS-agnostic)
 #############################
-progress "Checking Nix installation"
-if command -v nix >/dev/null 2>&1; then
-  NIX_VERSION=$(nix --version 2>/dev/null)
-  if [[ $NIX_VERSION == nix-* ]] || [ -d "/nix/store" ]; then
-    log "Nix is already installed: $NIX_VERSION"
-  else
-    log "Nix command exists but /nix/store not found; proceeding to install Nix..."
-    if [[ $EUID -eq 0 ]]; then
-      log "Installing Nix in multi-user mode..."
-      curl -L https://nixos.org/nix/install | sh
+progress "Checking jq installation"
+if ! command -v jq >/dev/null 2>&1; then
+  log "jq is not installed. Installing jq..."
+  case "$OS" in
+  Linux)
+    if command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update && sudo apt-get install -y jq
+    elif command -v yum >/dev/null 2>&1; then
+      sudo yum install -y jq
+    elif command -v dnf >/dev/null 2>&1; then
+      sudo dnf install -y jq
     else
-      log "Installing Nix in single-user mode..."
-      export NIX_MULTI_USER_ENABLE=0
-      if [ ! -d "/nix" ]; then
-        log "Directory /nix does not exist; attempting to create it using sudo."
-        sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix
-      fi
-      curl -L https://nixos.org/nix/install | sh
+      log "Unable to determine package manager for jq installation on Linux. Please install jq manually."
+      exit 1
     fi
-    if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-      . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    ;;
+  Darwin)
+    if command -v brew >/dev/null 2>&1; then
+      brew install jq
+    else
+      log "Homebrew not found on macOS. Please install jq manually or install Homebrew first."
+      exit 1
     fi
-  fi
+    ;;
+  *)
+    log "Unsupported OS for automatic jq installation. Please install jq manually."
+    exit 1
+    ;;
+  esac
 else
-  log "Nix command not found. Installing Nix..."
-  if [[ $EUID -eq 0 ]]; then
-    log "Installing Nix in multi-user mode..."
-    curl -L https://nixos.org/nix/install | sh
-  else
-    log "Installing Nix in single-user mode..."
-    export NIX_MULTI_USER_ENABLE=0
-    if [ ! -d "/nix" ]; then
-      log "Directory /nix does not exist; attempting to create it using sudo."
-      sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix
-    fi
-    curl -L https://nixos.org/nix/install | sh
-  fi
-  if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-  fi
+  log "jq is already installed."
 fi
 done_progress
 
 #############################
-# Step 5.5: Setup Nix Multi-User Environment (only if running as root)
+# Step 5: Install Nix (if needed)
 #############################
-if [[ $EUID -eq 0 ]]; then
-  progress "Setting up Nix multi-user environment"
-  log "Running as root. Proceeding with Nix multi-user setup."
-  if ! getent group nixbld >/dev/null; then
-    log "Creating group 'nixbld'..."
-    groupadd -r nixbld
-  fi
-
-  for n in $(seq 1 10); do
-    USERNAME="nixbld$n"
-    if ! id "$USERNAME" >/dev/null 2>&1; then
-      log "Creating build user $USERNAME..."
-      useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USERNAME"
-    else
-      log "Build user $USERNAME already exists."
-    fi
-    usermod -a -G nixbld "$USERNAME"
-  done
-  log "Nix build users group (nixbld) membership: $(getent group nixbld)"
-
-  if ! pgrep -x nix-daemon >/dev/null; then
-    log "Starting nix-daemon..."
-    nix-daemon &
-    sleep 5
-  fi
-
-  export NIX_REMOTE=daemon
-  log "Exported NIX_REMOTE=daemon"
-  done_progress
-else
-  log "Not running as root (EUID=$EUID): Skipping Nix multi-user environment setup."
-  done_progress
-fi
+# progress "Checking Nix installation"
+# if command -v nix >/dev/null 2>&1; then
+#   NIX_VERSION=$(nix --version 2>/dev/null)
+#   if [[ $NIX_VERSION == nix-* ]] || [ -d "/nix/store" ]; then
+#     log "Nix is already installed: $NIX_VERSION"
+#   else
+#     log "Nix command exists but /nix/store not found; proceeding to install Nix..."
+#     if [[ $EUID -eq 0 ]]; then
+#       log "Installing Nix in multi-user mode..."
+#       progress "Setting up Nix multi-user environment"
+#       log "Running as root. Proceeding with Nix multi-user setup."
+#       if ! getent group nixbld >/dev/null; then
+#         log "Creating group 'nixbld'..."
+#         groupadd -r nixbld
+#       fi
+#
+#       for n in $(seq 1 10); do
+#         USERNAME="nixbld$n"
+#         if ! id "$USERNAME" >/dev/null 2>&1; then
+#           log "Creating build user $USERNAME..."
+#           useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USERNAME"
+#         else
+#           log "Build user $USERNAME already exists."
+#         fi
+#         usermod -a -G nixbld "$USERNAME"
+#       done
+#       log "Nix build users group (nixbld) membership: $(getent group nixbld)"
+#
+#       curl -L https://nixos.org/nix/install | sh
+#     else
+#       log "Installing Nix in single-user mode..."
+#       progress "Setting up Nix multi-user environment"
+#       log "Running as root. Proceeding with Nix multi-user setup."
+#       if ! getent group nixbld >/dev/null; then
+#         log "Creating group 'nixbld'..."
+#         groupadd -r nixbld
+#       fi
+#
+#       for n in $(seq 1 10); do
+#         USERNAME="nixbld$n"
+#         if ! id "$USERNAME" >/dev/null 2>&1; then
+#           log "Creating build user $USERNAME..."
+#           useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USERNAME"
+#         else
+#           log "Build user $USERNAME already exists."
+#         fi
+#         usermod -a -G nixbld "$USERNAME"
+#       done
+#       log "Nix build users group (nixbld) membership: $(getent group nixbld)"
+#
+#       export NIX_MULTI_USER_ENABLE=0
+#       if [ ! -d "/nix" ]; then
+#         log "Directory /nix does not exist; attempting to create it using sudo."
+#         sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix
+#       fi
+#       curl -L https://nixos.org/nix/install | sh
+#     fi
+#     if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+#       . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+#     fi
+#   fi
+# else
+#   log "Nix command not found. Installing Nix..."
+#   if [[ $EUID -eq 0 ]]; then
+#     log "Installing Nix in multi-user mode..."
+#     curl -L https://nixos.org/nix/install | sh
+#   else
+#     log "Installing Nix in single-user mode..."
+#     export NIX_MULTI_USER_ENABLE=0
+#     if [ ! -d "/nix" ]; then
+#       log "Directory /nix does not exist; attempting to create it using sudo."
+#       sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix
+#     fi
+#     curl -L https://nixos.org/nix/install | sh
+#   fi
+#   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+#     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+#   fi
+# fi
+# done_progress
+#
+# #############################
+# # Step 5.5: Setup Nix Multi-User Environment (only if running as root)
+# #############################
+#
+# if [[ $EUID -eq 0 ]]; then
+#   if ! pgrep -x nix-daemon >/dev/null; then
+#     log "Starting nix-daemon..."
+#     nix-daemon &
+#     sleep 5
+#   fi
+#
+#   export NIX_REMOTE=daemon
+#   log "Exported NIX_REMOTE=daemon"
+#   done_progress
+# else
+#   log "Not running as root (EUID=$EUID): Skipping Nix multi-user environment setup."
+#   done_progress
+# fi
 
 #############################
 # Step 6: Install Ansible (OS-agnostic)
@@ -454,6 +514,62 @@ fi
 done_progress
 
 #############################
+# Step 7.1: Setup brewuser for Homebrew on Linux (if running as root)
+#############################
+# if [[ $OS == "Linux" && "$(id -u)" -eq 0 ]]; then
+#   progress "Ensuring brewuser exists and has access to /home/linuxbrew/.linuxbrew"
+#   if ! id brewuser >/dev/null 2>&1; then
+#     log "Creating brewuser..."
+#     useradd -m -s /bin/bash brewuser
+#   else
+#     log "brewuser already exists."
+#   fi
+#   # Ensure /home/linuxbrew/.linuxbrew exists and is owned by brewuser.
+#   if [ ! -d "/home/linuxbrew/.linuxbrew" ]; then
+#     log "Creating /home/linuxbrew/.linuxbrew directory..."
+#     mkdir -p /home/linuxbrew/.linuxbrew
+#   fi
+#   log "Setting ownership of /home/linuxbrew/.linuxbrew to brewuser..."
+#   chown -R brewuser:brewuser /home/linuxbrew/.linuxbrew
+#   done_progress
+# fi
+
+#############################
+# Step 7.2: Install Homebrew as brewuser on Linux (if running as root)
+#############################
+# if ! command -v brew >/dev/null 2>&1; then
+#   if [[ $OS == "Linux" && "$(id -u)" -eq 0 ]]; then
+#     progress "Installing Homebrew as brewuser on Linux"
+#     sudo -u brewuser env HOME=/home/brewuser HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+#     done_progress
+#   fi
+# fi
+
+#############################
+# Step 7.3: Install GitHub CLI authentication check (GH token prompt)
+#############################
+
+if [ "$ROLE" == "keyserver" ]; then
+  progress "Verifying GitHub CLI authentication"
+  if ! gh auth status >/dev/null 2>&1; then
+    log "GitHub CLI is not authenticated."
+    echo "Please enter your GitHub Personal Access Token (with appropriate permissions):"
+    read -r -p "GitHub Token: " TOKEN_INPUT
+    if [ -z "$TOKEN_INPUT" ]; then
+      log "No token provided, aborting."
+      exit 1
+    fi
+    export GH_TOKEN="$TOKEN_INPUT"
+    # Re-check authentication.
+    if ! gh auth status >/dev/null 2>&1; then
+      log "GitHub CLI authentication failed even after setting GH_TOKEN. Aborting."
+      exit 1
+    fi
+  fi
+  done_progress
+fi
+
+#############################
 # Step 8: Fetch GitHub SSH Private Key via rsync (if not keyserver)
 #############################
 if [ "$ROLE" != "keyserver" ]; then
@@ -494,9 +610,9 @@ if [ "$ROLE" == "keyserver" ]; then
   progress "Generating ECDSA SSH key pair for keyserver"
   mkdir -p "${HOME}/.ssh"
   chmod 700 "${HOME}/.ssh"
-  KEY_PATH="${HOME}/.ssh/id_ecdsa_keyserver"
+  KEY_PATH="${HOME}/.ssh/id_ecdsa_github"
   if [ ! -f "${KEY_PATH}" ]; then
-    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -q
+    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -C "" -q
     log "ECDSA key pair generated at ${KEY_PATH}."
     NEW_KEY=true
   else
@@ -508,24 +624,24 @@ if [ "$ROLE" == "keyserver" ]; then
   log "Local public key for GitHub:"
   echo "${PUBLIC_KEY}"
 
-  # Use GitHub CLI (gh) to compare and register key if needed.
+  # Use GitHub CLI (gh) via API commands to compare and register key if needed.
   if command -v gh >/dev/null 2>&1; then
-    KEY_TITLE="keyserver-key"
-    EXISTING_KEY_ID=$(gh ssh-key list --json id,title,key --jq ".[] | select(.title==\"$KEY_TITLE\") | .id")
-    EXISTING_KEY_CONTENT=$(gh ssh-key list --json id,title,key --jq ".[] | select(.title==\"$KEY_TITLE\") | .key")
+    KEY_TITLE="keyserver"
+    EXISTING_KEY_ID=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys | jq -r ".[] | select(.title==\"$KEY_TITLE\") | .id")
+    EXISTING_KEY_CONTENT=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys | jq -r ".[] | select(.title==\"$KEY_TITLE\") | .key")
 
     if [ -n "$EXISTING_KEY_ID" ]; then
       if [ "$PUBLIC_KEY" != "$EXISTING_KEY_CONTENT" ]; then
-        log "Local key differs from key registered on GitHub (ID: $EXISTING_KEY_ID). Deleting old key..."
-        gh ssh-key delete "$EXISTING_KEY_ID" --confirm
+        log "Local key differs from GitHub key (ID: $EXISTING_KEY_ID). Deleting old key..."
+        gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys/"$EXISTING_KEY_ID"
         log "Adding new key to GitHub..."
-        gh ssh-key add "${KEY_PATH}.pub" --title "$KEY_TITLE"
+        gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys -f "key=${PUBLIC_KEY}" -f "title=${KEY_TITLE}"
       else
         log "The SSH key is already correctly registered on GitHub."
       fi
     else
       log "No SSH key registered with title '$KEY_TITLE'. Adding key..."
-      gh ssh-key add "${KEY_PATH}.pub" --title "$KEY_TITLE"
+      gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys -f "key=${PUBLIC_KEY}" -f "title=${KEY_TITLE}"
     fi
   else
     log "GitHub CLI (gh) not found. Skipping automatic GitHub key management."
@@ -543,15 +659,12 @@ fi
 #############################
 # Step 10: Run ansible-pull to Provision the System
 #############################
+
 progress "Running ansible-pull"
-if [ "$ROLE" == "keyserver" ]; then
-  ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_keyserver"
-else
-  ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_github"
-fi
+ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_github"
 log "Using SSH key at ${ANSIBLE_PRIVATE_KEY} for ansible-pull."
 
-# Assumes that the repository root contains a file named "site.yml" that imports your actual playbook.
+# Assumes the repository root contains a file named "site.yml" that imports your actual playbook.
 ansible-pull -U "git@github.com:sparkleHazard/bootstrap.git" \
   -i "localhost," \
   --extra-vars "host_role=${ROLE}" \

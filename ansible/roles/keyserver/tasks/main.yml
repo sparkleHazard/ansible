@@ -36,6 +36,14 @@
     group: root
     mode: "0755"
 
+- name: Ensure directory for serving bootstrap script exists
+  file:
+    path: /var/www/html
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Copy bootstrap.sh to web server directory
   copy:
     src: "{{ playbook_dir }}/../bootstrap.sh"
