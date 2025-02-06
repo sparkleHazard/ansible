@@ -1,15 +1,17 @@
 #!/bin/bash
 # bootstrap.sh - OS-agnostic bootstrapping script with role arguments,
 # including retries, logging, dedicated brewuser creation for Homebrew installation,
-# conditional multi-user Nix setup, and automatic ansible-pull.
+# conditional multi-user Nix setup, installation of GitHub CLI,
+# key management via GitHub CLI, and automatic ansible-pull.
 #
 # This script installs prerequisites (sudo, curl, Git, rsync, Nix),
 # sets up Nix multi-user mode (if running as root),
 # installs Nix (multi-user if root, single-user otherwise),
 # and if running as root, creates a dedicated brewuser to install Homebrew.
 #
-# It then fetches the GitHub SSH private key via rsync (if role is not keyserver)
-# or, if role is keyserver, generates an ECDSA key pair and pauses to let you upload its public key.
+# It then installs GitHub CLI in an OS-agnostic manner,
+# fetches the GitHub SSH private key via rsync (if role is not keyserver)
+# or, if role is keyserver, generates an ECDSA key pair and compares it with GitHub using gh.
 #
 # Finally, it runs ansible-pull (using the appropriate SSH key) with the specified role.
 #
@@ -101,6 +103,19 @@ echo "EUID is: $EUID"
 #############################
 OS="$(uname -s)"
 log "Detected OS: ${OS}"
+
+#############################
+# Step 2.5: Verify .ssh Directory Exists
+#############################
+progress "Verifying .ssh directory"
+if [ -d "${HOME}/.ssh" ]; then
+  log ".ssh directory exists."
+else
+  log ".ssh directory not found. Creating .ssh directory..."
+  mkdir -p "${HOME}/.ssh"
+  chmod 700 "${HOME}/.ssh"
+fi
+done_progress
 
 #############################
 # Step 3: Ensure sudo is installed (if needed)
@@ -396,17 +411,47 @@ install_ansible
 done_progress
 
 #############################
-# Step 7: (Optional) Home Manager installation (commented out)
+# Step 7: Install GitHub CLI (gh) - OS-Agnostic
 #############################
-# progress "Checking Home Manager installation"
-# if ! command -v home-manager >/dev/null 2>&1; then
-#   log "Home Manager not found. Installing Home Manager..."
-#   nix profile install nixpkgs#home-manager
-# else
-#   log "Home Manager is already installed."
-# fi
-# log "Home Manager version: $(home-manager --version)"
-# done_progress
+progress "Checking GitHub CLI (gh) installation"
+if ! command -v gh >/dev/null 2>&1; then
+  log "GitHub CLI (gh) not found. Installing GitHub CLI..."
+  case "$OS" in
+  Darwin)
+    if command -v brew >/dev/null 2>&1; then
+      brew install gh
+    else
+      log "Homebrew not found on macOS. Please install GitHub CLI manually."
+      exit 1
+    fi
+    ;;
+  Linux)
+    if command -v apt-get >/dev/null 2>&1; then
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+      sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+      sudo apt-get update
+      sudo apt-get install -y gh
+    elif command -v dnf >/dev/null 2>&1; then
+      sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      sudo dnf install -y gh
+    elif command -v yum >/dev/null 2>&1; then
+      sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      sudo yum install -y gh
+    else
+      log "Please install GitHub CLI (gh) manually on Linux."
+      exit 1
+    fi
+    ;;
+  *)
+    log "Unsupported OS for automatic GitHub CLI installation. Please install gh manually."
+    exit 1
+    ;;
+  esac
+else
+  log "GitHub CLI (gh) is already installed."
+fi
+done_progress
 
 #############################
 # Step 8: Fetch GitHub SSH Private Key via rsync (if not keyserver)
@@ -443,7 +488,7 @@ else
 fi
 
 #############################
-# Step 9: Keyserver-Specific: Generate ECDSA SSH Key Pair and Conditionally Pause
+# Step 9: Keyserver-Specific: Generate ECDSA SSH Key Pair, Compare with GitHub, and Conditionally Pause
 #############################
 if [ "$ROLE" == "keyserver" ]; then
   progress "Generating ECDSA SSH key pair for keyserver"
@@ -460,11 +505,34 @@ if [ "$ROLE" == "keyserver" ]; then
   fi
 
   PUBLIC_KEY=$(cat "${KEY_PATH}.pub")
-  log "Public key for GitHub (upload this key to GitHub if not already done):"
+  log "Local public key for GitHub:"
   echo "${PUBLIC_KEY}"
 
+  # Use GitHub CLI (gh) to compare and register key if needed.
+  if command -v gh >/dev/null 2>&1; then
+    KEY_TITLE="keyserver-key"
+    EXISTING_KEY_ID=$(gh ssh-key list --json id,title,key --jq ".[] | select(.title==\"$KEY_TITLE\") | .id")
+    EXISTING_KEY_CONTENT=$(gh ssh-key list --json id,title,key --jq ".[] | select(.title==\"$KEY_TITLE\") | .key")
+
+    if [ -n "$EXISTING_KEY_ID" ]; then
+      if [ "$PUBLIC_KEY" != "$EXISTING_KEY_CONTENT" ]; then
+        log "Local key differs from key registered on GitHub (ID: $EXISTING_KEY_ID). Deleting old key..."
+        gh ssh-key delete "$EXISTING_KEY_ID" --confirm
+        log "Adding new key to GitHub..."
+        gh ssh-key add "${KEY_PATH}.pub" --title "$KEY_TITLE"
+      else
+        log "The SSH key is already correctly registered on GitHub."
+      fi
+    else
+      log "No SSH key registered with title '$KEY_TITLE'. Adding key..."
+      gh ssh-key add "${KEY_PATH}.pub" --title "$KEY_TITLE"
+    fi
+  else
+    log "GitHub CLI (gh) not found. Skipping automatic GitHub key management."
+  fi
+
   if [ "$NEW_KEY" = true ]; then
-    echo "Press Enter to continue after you have added the public key to GitHub..."
+    echo "Press Enter to continue after you have verified the public key on GitHub..."
     read -r
   else
     log "Key already exists; skipping pause."
@@ -476,7 +544,11 @@ fi
 # Step 10: Run ansible-pull to Provision the System
 #############################
 progress "Running ansible-pull"
-ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_github"
+if [ "$ROLE" == "keyserver" ]; then
+  ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_keyserver"
+else
+  ANSIBLE_PRIVATE_KEY="${HOME}/.ssh/id_ecdsa_github"
+fi
 log "Using SSH key at ${ANSIBLE_PRIVATE_KEY} for ansible-pull."
 
 # Assumes that the repository root contains a file named "site.yml" that imports your actual playbook.
