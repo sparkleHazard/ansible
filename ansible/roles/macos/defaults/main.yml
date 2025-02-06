@@ -1,0 +1,9 @@
+---
+brew_cask_packages:
+  - dropbox
+  - firefox
+  - google-chrome
+  - iterm2
+  - kitty
+  - keepassxc
+  - bitwarden

@@ -6,13 +6,13 @@ server {
     # allow 192.168.1.0/24;
     # deny all;
 
-    location /github_key {
-        alias /var/www/keys/id_ecdsa_keyserver.pub;  # or adjust if you serve a different file
-        default_type text/plain;
+    location = /bootstrap.sh {
+      alias /var/www/html/bootstrap.sh;
+      default_type text/plain;
     }
 
-    location /bootstrap.sh {
-      alias /var/www/html/bootstrap.sh;
+    location = /github_key {
+      alias /var/www/keys/id_ecdsa_keyserver;  # or adjust if you serve a different file
       default_type text/plain;
     }
 }

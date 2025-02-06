@@ -1,0 +1,12 @@
+---
+brew_packages:
+  - git
+  - git-lfs
+  - jq
+  - ssh-copy-id
+  - tmux
+  - tree
+  - wget
+  - zsh
+  - neovim
+  - mise

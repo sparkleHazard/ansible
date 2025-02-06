@@ -1,0 +1,8 @@
+---
+- name: Install Homebrew Cask Packages
+  homebrew_cask:
+    name: "{{ brew_cask_packages }}"
+    state: present
+  register: cask_install_result
+  until: cask_install_result is success
+  when: ansible_system == "Darwin"

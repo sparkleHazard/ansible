@@ -18,12 +18,17 @@
 # If no role is specified, the default "base" is used.
 #
 set -euo pipefail
+echo "EUID is: $EUID"
 
 #############################
 # Logging & Retry Functions
 #############################
+# log() {
+#   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+# }
+
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+  stdbuf -o0 echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
 retry_command() {
@@ -187,52 +192,119 @@ else
 fi
 
 #############################
-# Step 5: Install Nix (if needed)
+# Step 4.75: Ensure rsync is installed (OS-agnostic)
 #############################
-# Create the nixbld group if it doesn't exist.
-if ! getent group nixbld >/dev/null; then
-  log "Creating group 'nixbld'..."
-  groupadd -r nixbld
+if ! command -v rsync >/dev/null 2>&1; then
+  log "rsync is not installed. Installing rsync..."
+  case "$OS" in
+  Linux)
+    if command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update && sudo apt-get install -y rsync
+    elif command -v yum >/dev/null 2>&1; then
+      sudo yum install -y rsync
+    elif command -v dnf >/dev/null 2>&1; then
+      sudo dnf install -y rsync
+    else
+      log "Unable to determine package manager for rsync installation on Linux. Please install rsync manually."
+      exit 1
+    fi
+    ;;
+  Darwin)
+    if command -v brew >/dev/null 2>&1; then
+      brew install rsync
+    else
+      log "Homebrew not found on macOS. Please install rsync manually or install Homebrew first."
+      exit 1
+    fi
+    ;;
+  *)
+    log "Unsupported OS for automatic rsync installation. Please install rsync manually."
+    exit 1
+    ;;
+  esac
+else
+  log "rsync is already installed."
 fi
 
-# Create 10 build users (nixbld1 to nixbld10) if they are not already present,
-# and add them as explicit members of the nixbld group.
-for n in $(seq 1 10); do
-  USER="nixbld$n"
-  if ! id "$USER" >/dev/null 2>&1; then
-    log "Creating build user $USER..."
-    useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USER"
-  else
-    log "Build user $USER already exists."
-  fi
-  # Ensure the user is explicitly listed as a member of nixbld.
-  usermod -a -G nixbld "$USER"
-done
-log "Nix build users group (nixbld) membership: $(getent group nixbld)"
+#############################
+# Step 5: Install Nix (if needed)
+#############################
+if [ ! -d "/nix" ]; then
+  log "Directory /nix does not exist; attempting to create it using sudo."
+  sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix || {
+    log "Failed to create /nix. Please create it manually and re-run the script."
+    exit 1
+  }
+fi
 
 if ! command -v nix >/dev/null 2>&1; then
-  log "Nix is not installed. Installing Nix..."
-  curl -L https://nixos.org/nix/install | sh
-  if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+  if [[ $EUID -eq 0 ]]; then
+    log "Nix is not installed. Installing Nix in multi-user mode..."
+    curl -L https://nixos.org/nix/install | sh
+    if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+      . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    fi
+  else
+    log "Nix is not installed. Installing Nix in single-user mode..."
+    export NIX_MULTI_USER_ENABLE=0
+    curl -L https://nixos.org/nix/install | sh
+    if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+      . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    fi
   fi
+  source $HOME/.nix-profile/etc/profile.d/nix.sh
 else
   log "Nix is already installed."
 fi
 
-#############################
-# Step 5.5: Setup Nix Multi-User Environment
-#############################
-# Start the nix-daemon if not already running.
-if ! pgrep -x nix-daemon >/dev/null; then
-  log "Starting nix-daemon..."
-  nix-daemon &
-  sleep 5 # Allow some time for the daemon to start.
+if [ ! -f /etc/profile.d/nix.sh ]; then
+  log "Creating /etc/profile.d/nix.sh to source Nix environment..."
+  echo ". /root/.nix-profile/etc/profile.d/nix.sh" | sudo tee /etc/profile.d/nix.sh >/dev/null
+  sudo chmod 644 /etc/profile.d/nix.sh
+else
+  log "/etc/profile.d/nix.sh already exists."
 fi
 
-# Export NIX_REMOTE for unprivileged users.
-export NIX_REMOTE=daemon
-log "Exported NIX_REMOTE=daemon"
+#############################
+# Step 5.5: Setup Nix Multi-User Environment (only if running as root)
+#############################
+if [[ $EUID -eq 0 ]]; then
+  log "Running as root. Proceeding with Nix multi-user setup."
+
+  # Create the nixbld group if it doesn't exist.
+  if ! getent group nixbld >/dev/null; then
+    log "Creating group 'nixbld'..."
+    groupadd -r nixbld
+  fi
+
+  # Create 10 build users (nixbld1 to nixbld10) if they are not already present,
+  # and ensure each is explicitly added as a member of the nixbld group.
+  for n in $(seq 1 10); do
+    USER="nixbld$n"
+    if ! id "$USER" >/dev/null 2>&1; then
+      log "Creating build user $USER..."
+      useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USER"
+    else
+      log "Build user $USER already exists."
+    fi
+    # Ensure the user is explicitly listed as a member of nixbld.
+    usermod -a -G nixbld "$USER"
+  done
+  log "Nix build users group (nixbld) membership: $(getent group nixbld)"
+
+  # Start the nix-daemon if not already running.
+  if ! pgrep -x nix-daemon >/dev/null; then
+    log "Starting nix-daemon..."
+    nix-daemon &
+    sleep 5 # Allow some time for the daemon to start.
+  fi
+
+  # Export NIX_REMOTE for unprivileged users.
+  export NIX_REMOTE=daemon
+  log "Exported NIX_REMOTE=daemon"
+else
+  log "Not running as root (EUID=$EUID): Skipping Nix multi-user environment setup."
+fi
 
 #############################
 # Step 6: Install Ansible (OS-agnostic)
@@ -327,13 +399,13 @@ install_ansible
 # Step 9: Fetch GitHub SSH Private Key (if not keyserver)
 #############################
 if [ "$ROLE" != "keyserver" ]; then
-  GITHUB_KEY_URL="192.168.1.8/github_key"
+  GITHUB_KEY_URL="//192.168.1.8/keys/id_ecdsa_github"
   log "Fetching GitHub SSH private key from ${GITHUB_KEY_URL}..."
   mkdir -p "${HOME}/.ssh"
   chmod 700 "${HOME}/.ssh"
-  PRIVATE_KEY_DEST="${HOME}/.ssh/id_rsa_github"
+  PRIVATE_KEY_DEST="${HOME}/.ssh/id_ecdsa_github"
 
-  retry_command 5 10 curl -sSf "${GITHUB_KEY_URL}" -o /tmp/github_key
+  retry_command 5 10 rsync -avz rsync:"${GITHUB_KEY_URL}" /tmp/github_key
   if [ $? -ne 0 ]; then
     log "Error: Unable to fetch GitHub SSH private key from ${GITHUB_KEY_URL} after retries."
     exit 1

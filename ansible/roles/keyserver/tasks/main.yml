@@ -44,8 +44,8 @@
 
 - name: Copy generated SSH public key to serving directory
   copy:
-    src: /root/.ssh/id_ecdsa_keyserver.pub
-    dest: /var/www/keys/id_ecdsa_keyserver.pub
+    src: /root/.ssh/id_ecdsa_github
+    dest: /var/www/keys/id_ecdsa_github
     owner: root
     group: root
     mode: "0644"
@@ -74,6 +74,26 @@
     name: nginx
     state: started
     enabled: yes
+
+- name: Deploy rsyncd configuration
+  template:
+    src: rsyncd.conf.j2
+    dest: /etc/rsyncd.conf
+    mode: "0644"
+  notify: Restart rsyncd
+
+- name: Start rsync daemon if not already running
+  command: rsync --daemon
+  args:
+    creates: /var/run/rsyncd.pid
+
+- name: Debug rsync daemon status
+  shell: ps aux | grep "[r]sync --daemon"
+  register: rsync_status
+  changed_when: false
+
+- debug:
+    var: rsync_status.stdout_lines
 
 # Handlers
 - name: Reload Nginx

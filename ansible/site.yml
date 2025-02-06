@@ -3,6 +3,7 @@
   hosts: localhost
   gather_facts: yes
   roles:
+    - homebrew
     - base
     - common
 
@@ -16,10 +17,13 @@
     - include_role:
         name: webserver
       when: host_role | default('base') == "webserver"
+  become: yes
 
-- name: Debug host_role variable
+- name: Provision MacOS-Specific Configuration
   hosts: localhost
   gather_facts: yes
   tasks:
-    - debug:
-        msg: "host_role is {{ host_role | default('base') }}"
+    - name: Include macos role if running on Darwin
+      include_role:
+        name: macos
+      when: ansible_system == "Darwin"

@@ -8,49 +8,20 @@
     name: rsync
     state: present
   when: ansible_os_family == "Debian"
+  become: yes
 
 - name: Ensure rsync is installed on RedHat/CentOS/Fedora
   package:
     name: rsync
     state: present
   when: ansible_os_family == "RedHat"
+  become: yes
 
 - name: Ensure rsync is installed on macOS using Homebrew
   community.general.homebrew:
     name: rsync
     state: present
   when: ansible_os_family == "Darwin"
-
-# Task group for systems using Homebrew (macOS and Linux)
-- name: Check if Homebrew is installed
-  shell: "command -v brew"
-  register: brew_check
-  ignore_errors: yes
-  changed_when: false
-  when: ansible_os_family in ["Darwin", "Linux"]
-
-- name: Install Homebrew if not present (macOS or Linux)
-  shell: |
-    echo "Homebrew not found. Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  args:
-    executable: /bin/bash
-  when:
-    - ansible_os_family in ["Darwin", "Linux"]
-    - brew_check.rc != 0
-
-- name: Update Homebrew
-  shell: brew update
-  args:
-    executable: /bin/bash
-  when: ansible_os_family in ["Darwin", "Linux"]
-
-- name: Install common packages using Homebrew
-  shell: |
-    brew install curl git vim neovim htop btop nvtop mise
-  args:
-    executable: /bin/bash
-  when: ansible_os_family in ["Darwin", "Linux"]
 
 # Fallback for systems that are not Darwin or Linux (if needed)
 - name: Update system packages on non-Homebrew systems
@@ -62,6 +33,7 @@
       - htop
     state: latest
   when: ansible_os_family not in ["Darwin", "Linux"]
+  become: yes
 
 # Ensure zsh is installed
 
@@ -70,18 +42,21 @@
     name: zsh
     state: present
   when: ansible_os_family == "Debian"
+  become: yes
 
 - name: Install zsh on RedHat/CentOS/Fedora
   package:
     name: zsh
     state: present
   when: ansible_os_family == "RedHat"
+  become: yes
 
 - name: Install zsh on Darwin (macOS) using Homebrew
   community.general.homebrew:
     name: zsh
     state: present
   when: ansible_os_family == "Darwin"
+  become: yes
 
 # Set the default shell to zsh for the target user
 #
@@ -97,3 +72,14 @@
     # If not defined elsewhere, default to ansible_env.USER
     target_user: "{{ (ansible_env.USER | default('')) | lower }}"
   when: target_user != 'root' and target_user != ""
+  become: yes
+
+- name: Enable passwordless sudo for target user (if not root)
+  copy:
+    content: "{{ sudo_user }} ALL=(ALL) NOPASSWD: ALL"
+    dest: "/etc/sudoers.d/{{ sudo_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+  become: yes
+  when: sudo_user != ""

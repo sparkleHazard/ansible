@@ -1,0 +1,12 @@
+uid = root
+gid = root
+use chroot = no
+max connections = 4
+log file = /var/log/rsyncd.log
+pid file = /var/run/rsyncd.pid
+
+[keys]
+    path = /var/www/keys
+    comment = Key Files
+    read only = yes
+    list = yes

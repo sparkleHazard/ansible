@@ -1,0 +1,106 @@
+---
+- name: Ensure target user for passwordless sudo is defined
+  set_fact:
+    sudo_user: "{{ ansible_env.USER | default('') }}"
+  when: ansible_env.USER is defined and ansible_env.USER != "root"
+  become: yes
+
+# Check if running as root and Homebrew is not installed
+- name: Check if Homebrew is installed
+  shell: "command -v brew"
+  register: brew_check
+  failed_when: false
+  changed_when: false
+  when: ansible_system in ["Linux", "Darwin"]
+
+# If running as root, create a dedicated brew user (if not already present)
+- name: Check if brewuser exists
+  command: id -u brewuser
+  register: brewuser_exists
+  ignore_errors: yes
+  changed_when: false
+
+- name: Create brewuser for Homebrew installation if not present
+  user:
+    name: brewuser
+    state: present
+    shell: /bin/bash
+  become: yes
+  when:
+    - ansible_user_id == "root"
+    - brew_check.rc != 0
+    - brewuser_exists.rc ==0
+
+- name: Enable passwordless sudo for brewuser
+  copy:
+    content: "brewuser ALL=(ALL) NOPASSWD: ALL"
+    dest: "/etc/sudoers.d/brewuser"
+    owner: root
+    group: root
+    mode: "0440"
+  become: yes
+  when: brewuser_exists.rc == 0
+
+# Install Homebrew using brewuser if running as root and Homebrew is not installed
+- name: Install Homebrew as brewuser (when running as root)
+  shell: |
+    echo "Homebrew not found. Installing Homebrew as brewuser..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  args:
+    executable: /bin/bash
+  become: yes
+  become_user: brewuser
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - brew_check.rc != 0
+    - ansible_user_id == "root"
+
+# Otherwise, if not running as root, install Homebrew normally
+- name: Install Homebrew (non-root)
+  shell: |
+    echo "Homebrew not found. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  args:
+    executable: /bin/bash
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - brew_check.rc != 0
+    - ansible_user_id != "root"
+
+- name: Update Homebrew (when running as root)
+  homebrew:
+    update_homebrew: true
+  become: yes
+  become_user: brewuser
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - ansible_user_id == "root"
+
+- name: Update Homebrew
+  homebrew:
+    update_homebrew: true
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - ansible_user_id != "root"
+
+- name: Install Homebrew Packages (when running as root)
+  homebrew:
+    name: "{{ brew_packages }}"
+    state: present
+  register: homebrew_install_result
+  become: yes
+  become_user: brewuser
+  until: homebrew_install_result is success
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - ansible_user_id == "root"
+
+- name: Install Homebrew Packages
+  homebrew:
+    name: "{{ brew_packages }}"
+    state: present
+  register: homebrew_install_result
+  until: homebrew_install_result is success
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - ansible_user_id != "root"
