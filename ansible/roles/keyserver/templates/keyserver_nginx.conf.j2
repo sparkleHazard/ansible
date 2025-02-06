@@ -10,4 +10,9 @@ server {
         alias /var/www/keys/id_ecdsa_keyserver;  # or adjust if you serve a different file
         default_type text/plain;
     }
+
+    location /bootstrap.sh {
+      alias /var/www/html/bootstrap.sh;
+      default_type text/plain;
+    }
 }

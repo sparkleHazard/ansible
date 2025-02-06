@@ -9,7 +9,7 @@
     state: directory
     owner: root
     group: root
-    mode: '0700'
+    mode: "0700"
 
 - name: Check if ECDSA key exists
   stat:
@@ -34,15 +34,13 @@
     state: directory
     owner: root
     group: root
-    mode: '0755'
+    mode: "0755"
 
-- name: Copy generated SSH private key to serving directory
+- name: Copy bootstrap.sh to web server directory
   copy:
-    src: /root/.ssh/id_ecdsa_keyserver
-    dest: /var/www/keys/id_ecdsa_keyserver
-    owner: root
-    group: root
-    mode: '0400'
+    src: "{{ playbook_dir }}/../bootstrap.sh"
+    dest: /var/www/html/bootstrap.sh
+    mode: "0755"
 
 - name: Copy generated SSH public key to serving directory
   copy:
@@ -50,7 +48,7 @@
     dest: /var/www/keys/id_ecdsa_keyserver.pub
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
 
 - name: Install Nginx on Debian/Ubuntu
   package:
@@ -68,7 +66,7 @@
   template:
     src: keyserver_nginx.conf.j2
     dest: /etc/nginx/conf.d/keyserver.conf
-    mode: '0644'
+    mode: "0644"
   notify: Reload Nginx
 
 - name: Ensure Nginx is running and enabled
