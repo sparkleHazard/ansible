@@ -299,35 +299,35 @@ install_ansible
 #############################
 # Step 8: Fetch Approved SSH Public Key (if not keyserver)
 #############################
-if [ "$ROLE" != "keyserver" ]; then
-  LOCAL_KEY_URL="http://localserver.example.com/approved_key.pub"
-  log "Fetching approved SSH public key from ${LOCAL_KEY_URL}..."
-  mkdir -p "${HOME}/.ssh"
-  chmod 700 "${HOME}/.ssh"
-  KEY_DEST="${HOME}/.ssh/authorized_keys"
-
-  retry_command 5 10 curl -sSf "${LOCAL_KEY_URL}" -o /tmp/approved_key.pub
-  if [ $? -ne 0 ]; then
-    log "Error: Unable to fetch approved SSH key from ${LOCAL_KEY_URL} after retries."
-    exit 1
-  fi
-
-  if ! grep -qFf /tmp/approved_key.pub "${KEY_DEST}" 2>/dev/null; then
-    cat /tmp/approved_key.pub >>"${KEY_DEST}"
-    log "Approved SSH public key added to authorized_keys."
-  else
-    log "Approved SSH public key already present in authorized_keys."
-  fi
-  chmod 600 "${KEY_DEST}"
-else
-  log "Role is 'keyserver'. Skipping SSH public key fetch."
-fi
+# if [ "$ROLE" != "keyserver" ]; then
+#   LOCAL_KEY_URL="192.168.1.8/approved_key.pub"
+#   log "Fetching approved SSH public key from ${LOCAL_KEY_URL}..."
+#   mkdir -p "${HOME}/.ssh"
+#   chmod 700 "${HOME}/.ssh"
+#   KEY_DEST="${HOME}/.ssh/authorized_keys"
+#
+#   retry_command 5 10 curl -sSf "${LOCAL_KEY_URL}" -o /tmp/approved_key.pub
+#   if [ $? -ne 0 ]; then
+#     log "Error: Unable to fetch approved SSH key from ${LOCAL_KEY_URL} after retries."
+#     exit 1
+#   fi
+#
+#   if ! grep -qFf /tmp/approved_key.pub "${KEY_DEST}" 2>/dev/null; then
+#     cat /tmp/approved_key.pub >>"${KEY_DEST}"
+#     log "Approved SSH public key added to authorized_keys."
+#   else
+#     log "Approved SSH public key already present in authorized_keys."
+#   fi
+#   chmod 600 "${KEY_DEST}"
+# else
+#   log "Role is 'keyserver'. Skipping SSH public key fetch."
+# fi
 
 #############################
 # Step 9: Fetch GitHub SSH Private Key (if not keyserver)
 #############################
 if [ "$ROLE" != "keyserver" ]; then
-  GITHUB_KEY_URL="https://secure-internal.example.com/github_key"
+  GITHUB_KEY_URL="192.168.1.8/github_key"
   log "Fetching GitHub SSH private key from ${GITHUB_KEY_URL}..."
   mkdir -p "${HOME}/.ssh"
   chmod 700 "${HOME}/.ssh"
