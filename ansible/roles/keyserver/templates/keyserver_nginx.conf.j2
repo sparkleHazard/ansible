@@ -7,7 +7,7 @@ server {
     # deny all;
 
     location /github_key {
-        alias /var/www/keys/id_ecdsa_keyserver;  # or adjust if you serve a different file
+        alias /var/www/keys/id_ecdsa_keyserver.pub;  # or adjust if you serve a different file
         default_type text/plain;
     }
 
