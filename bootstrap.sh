@@ -189,19 +189,6 @@ fi
 #############################
 # Step 5: Install Nix (if needed)
 #############################
-if ! command -v nix >/dev/null 2>&1; then
-  log "Nix is not installed. Installing Nix..."
-  curl -L https://nixos.org/nix/install | sh
-  if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-  fi
-else
-  log "Nix is already installed."
-fi
-
-#############################
-# Step 5.5: Setup Nix Multi-User Environment
-#############################
 # Create the nixbld group if it doesn't exist.
 if ! getent group nixbld >/dev/null; then
   log "Creating group 'nixbld'..."
@@ -223,6 +210,19 @@ for n in $(seq 1 10); do
 done
 log "Nix build users group (nixbld) membership: $(getent group nixbld)"
 
+if ! command -v nix >/dev/null 2>&1; then
+  log "Nix is not installed. Installing Nix..."
+  curl -L https://nixos.org/nix/install | sh
+  if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+  fi
+else
+  log "Nix is already installed."
+fi
+
+#############################
+# Step 5.5: Setup Nix Multi-User Environment
+#############################
 # Start the nix-daemon if not already running.
 if ! pgrep -x nix-daemon >/dev/null; then
   log "Starting nix-daemon..."
