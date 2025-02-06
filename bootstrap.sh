@@ -288,13 +288,13 @@ install_ansible
 #############################
 # Step 7: Install Home Manager via Nix (if needed)
 #############################
-if ! command -v home-manager >/dev/null 2>&1; then
-  log "Home Manager not found. Installing Home Manager..."
-  nix profile install nixpkgs#home-manager
-else
-  log "Home Manager is already installed."
-fi
-log "Home Manager version: $(home-manager --version)"
+# if ! command -v home-manager >/dev/null 2>&1; then
+#   log "Home Manager not found. Installing Home Manager..."
+#   nix profile install nixpkgs#home-manager
+# else
+#   log "Home Manager is already installed."
+# fi
+# log "Home Manager version: $(home-manager --version)"
 
 #############################
 # Step 8: Fetch Approved SSH Public Key (if not keyserver)
