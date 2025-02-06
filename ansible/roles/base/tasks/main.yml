@@ -83,3 +83,8 @@
     mode: "0440"
   become: yes
   when: sudo_user != ""
+
+- name: Run 'mise install' command
+  shell: mise install
+  register: mise_use_result
+  changed_when: false
