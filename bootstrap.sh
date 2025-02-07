@@ -604,7 +604,7 @@ else
 fi
 
 #############################
-# Step 9: Keyserver-Specific: Generate ECDSA SSH Key Pair, Compare with GitHub, and Conditionally Pause
+# Step 9: Keyserver-Specific: Generate ECDSA SSH Key Pair, Test SSH Access, and Update GitHub Key if Denied
 #############################
 if [ "$ROLE" == "keyserver" ]; then
   progress "Generating ECDSA SSH key pair for keyserver"
@@ -612,7 +612,7 @@ if [ "$ROLE" == "keyserver" ]; then
   chmod 700 "${HOME}/.ssh"
   KEY_PATH="${HOME}/.ssh/id_ecdsa_github"
   if [ ! -f "${KEY_PATH}" ]; then
-    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -C "" -q
+    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -q
     log "ECDSA key pair generated at ${KEY_PATH}."
     NEW_KEY=true
   else
@@ -624,31 +624,35 @@ if [ "$ROLE" == "keyserver" ]; then
   log "Local public key for GitHub:"
   echo "${PUBLIC_KEY}"
 
-  # Use GitHub CLI (gh) via API commands to compare and register key if needed.
-  if command -v gh >/dev/null 2>&1; then
-    KEY_TITLE="keyserver"
-    EXISTING_KEY_ID=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys | jq -r ".[] | select(.title==\"$KEY_TITLE\") | .id")
-    EXISTING_KEY_CONTENT=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys | jq -r ".[] | select(.title==\"$KEY_TITLE\") | .key")
-
-    if [ -n "$EXISTING_KEY_ID" ]; then
-      if [ "$PUBLIC_KEY" != "$EXISTING_KEY_CONTENT" ]; then
-        log "Local key differs from GitHub key (ID: $EXISTING_KEY_ID). Deleting old key..."
-        gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys/"$EXISTING_KEY_ID"
-        log "Adding new key to GitHub..."
-        gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys -f "key=${PUBLIC_KEY}" -f "title=${KEY_TITLE}"
-      else
-        log "The SSH key is already correctly registered on GitHub."
-      fi
-    else
-      log "No SSH key registered with title '$KEY_TITLE'. Adding key..."
-      gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /user/keys -f "key=${PUBLIC_KEY}" -f "title=${KEY_TITLE}"
-    fi
+  # Test SSH access to GitHub using the local key.
+  # We use BatchMode and disable strict host checking.
+  SSH_TEST=$(ssh -T -o BatchMode=yes -o StrictHostKeyChecking=no -i "${KEY_PATH}" git@github.com 2>&1 || true)
+  if echo "$SSH_TEST" | grep -qi "successfully authenticated"; then
+    log "SSH key is accepted by GitHub."
   else
-    log "GitHub CLI (gh) not found. Skipping automatic GitHub key management."
+    log "SSH key access denied. Updating GitHub key..."
+    if command -v gh >/dev/null 2>&1; then
+      KEY_TITLE="keyserver"
+      EXISTING_KEY_ID=$(gh api -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        /user/keys | jq -r ".[] | select(.title==\"$KEY_TITLE\") | .id")
+      if [ -n "$EXISTING_KEY_ID" ]; then
+        log "Deleting old GitHub key with ID: $EXISTING_KEY_ID"
+        gh api --method DELETE -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          /user/keys/"$EXISTING_KEY_ID"
+      fi
+      log "Adding new SSH key to GitHub..."
+      gh api --method POST -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        /user/keys -f "key=${PUBLIC_KEY}" -f "title=${KEY_TITLE}"
+    else
+      log "GitHub CLI (gh) not found. Cannot update GitHub key automatically."
+    fi
   fi
 
   if [ "$NEW_KEY" = true ]; then
-    echo "Press Enter to continue after you have verified the public key on GitHub..."
+    echo "Press Enter to continue after verifying the public key on GitHub..."
     read -r
   else
     log "Key already exists; skipping pause."
