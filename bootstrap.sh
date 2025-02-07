@@ -30,6 +30,7 @@ set -euo pipefail
 #############################
 ROLE="base"
 VERBOSE=false
+RUN_MISE_INSTALL=false
 for arg in "$@"; do
   case $arg in
   --role=*)
@@ -40,8 +41,12 @@ for arg in "$@"; do
     VERBOSE=true
     shift
     ;;
+  --mise-install)
+    RUN_MISE_INSTALL=true
+    shift
+    ;;
   -h | --help)
-    echo "Usage: $0 [--role=ROLE] [--verbose]"
+    echo "Usage: $0 [--role=ROLE] [--verbose] [--mise-install]"
     exit 0
     ;;
   *)
@@ -50,7 +55,6 @@ for arg in "$@"; do
     ;;
   esac
 done
-
 #############################
 # Step 1.2: Progress Message Functions
 #############################
@@ -544,14 +548,15 @@ log "Bootstrapping complete."
 # Step 6: Create one-shot systemd service for mise install
 #############################
 
-progress "Creating one-shot systemd service for mise install"
+if [ "$RUN_MISE_INSTALL" = true ]; then
+  log "Setting up one-shot service to run 'mise install' after reboot."
 
-# Determine the target user (the user who invoked the script)
-TARGET_USER=${SUDO_USER:-$USER}
-# Determine the home directory for that user:
-TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+  # Determine the target user: if run with sudo, use SUDO_USER; otherwise, use USER.
+  TARGET_USER=${SUDO_USER:-$USER}
+  # Retrieve the home directory of the target user.
+  TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 
-cat <<EOF | sudo tee /etc/systemd/system/mise-install-once.service
+  cat <<EOF | sudo tee /etc/systemd/system/mise-install-once.service
 [Unit]
 Description=Run mise install once after reboot
 After=network.target
@@ -567,10 +572,10 @@ ExecStartPost=/bin/systemctl disable mise-install-once.service && /bin/rm -f /et
 WantedBy=multi-user.target
 EOF
 
-# Reload systemd configuration and enable the service
-sudo systemctl daemon-reload
-sudo systemctl enable mise-install-once.service
-
-# Reboot the system
-log "Rebooting the system so that the one-shot service can run..."
-sudo reboot
+  sudo systemctl daemon-reload
+  sudo systemctl enable mise-install-once.service
+  log "One-shot service created and enabled. Rebooting now..."
+  sudo reboot
+else
+  log "Mise install flag not set. Skipping one-shot service setup."
+fi
