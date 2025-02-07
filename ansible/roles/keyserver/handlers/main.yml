@@ -3,6 +3,8 @@
   service:
     name: nginx
     state: reloaded
+  become: True
 
 - name: Restart rsyncd
   command: rsync --daemon --no-detach
+  become: True
