@@ -89,3 +89,9 @@
   register: mise_use_result
   changed_when: false
   when: host_role | default('base') != "keyserver"
+
+- name: Install qemu-guest-agent if running in a QEMU/KVM virtual machine
+  package:
+    name: qemu-guest-agent
+    state: present
+  when: (ansible_virtualization_role == "guest") and (ansible_virtualization_type in ["qemu", "kvm"])
