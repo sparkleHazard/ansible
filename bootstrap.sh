@@ -534,6 +534,7 @@ ansible-pull -U "git@github.com:sparkleHazard/bootstrap.git" \
   --extra-vars "host_role=${ROLE}" \
   --private-key "${ANSIBLE_PRIVATE_KEY}" \
   --accept-host-key \
+  --vault-password-file "$HOME/.vault_pass.txt" \
   ansible/site.yml
 done_progress
 

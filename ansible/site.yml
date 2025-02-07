@@ -2,6 +2,8 @@
 - name: Apply base Linux configuration
   hosts: localhost
   gather_facts: True
+  vars:
+    ansible_become_password: "{{ vault_become_password }}"
   tasks:
     - name: Include base Linux roles
       include_role:
@@ -15,14 +17,24 @@
 - name: Apply keyserver configuration
   hosts: localhost
   gather_facts: True
+  vars:
+    ansible_become_password: "{{ vault_become_password }}"
   tasks:
-    - include_role:
-        name: keyserver
+    - name: Include base Linux roles
+      include_role:
+        name: "{{ item }}"
+      loop:
+        - homebrew
+        - base
+        - dotfiles
+        - keyserver
       when: host_role | default('base') == "keyserver" and ansible_system == "Linux"
 
 - name: Apply base MacOS Configuration
   hosts: localhost
   gather_facts: True
+  vars:
+    ansible_become_password: "{{ vault_become_password }}"
   tasks:
     - name: Include base MacOS roles
       include_role:
