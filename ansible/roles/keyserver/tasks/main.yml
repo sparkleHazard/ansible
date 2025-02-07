@@ -3,25 +3,25 @@
 # and serve the private key securely via Nginx.
 # It also prints the public key so that you can add it to GitHub.
 
-- name: Ensure .ssh directory exists for root
+- name: Ensure .ssh directory exists
   file:
-    path: /root/.ssh
+    path: "{{ ansible_env.HOME }}/.ssh"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ ansible_env.USER }}"
+    group: "{{ ansible_env.USER }}"
     mode: "0700"
 
 - name: Check if ECDSA key exists
   stat:
-    path: /root/.ssh/id_ecdsa_keyserver
+    path: "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github"
   register: key_stat
 
 - name: Generate ECDSA SSH key pair for keyserver (if not exists)
-  command: ssh-keygen -t ecdsa -b 521 -f /root/.ssh/id_ecdsa_keyserver -N ""
+  command: ssh-keygen -t ecdsa -b 521 -f "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github" -N ""
   when: not key_stat.stat.exists
 
 - name: Read generated public key
-  command: cat /root/.ssh/id_ecdsa_keyserver.pub
+  command: "cat {{ ansible_env.HOME }}/.ssh/id_ecdsa_github.pub"
   register: public_key_output
 
 - name: Print public key (copy this to GitHub as your deploy key)
@@ -35,6 +35,7 @@
     owner: root
     group: root
     mode: "0755"
+  become: True
 
 - name: Ensure directory for serving bootstrap script exists
   file:
@@ -43,6 +44,7 @@
     owner: root
     group: root
     mode: "0755"
+  become: True
 
 - name: Copy bootstrap.sh to web server directory
   copy:
@@ -52,23 +54,26 @@
 
 - name: Copy generated SSH public key to serving directory
   copy:
-    src: /root/.ssh/id_ecdsa_github
+    src: "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github"
     dest: /var/www/keys/id_ecdsa_github
     owner: root
     group: root
     mode: "0644"
+  become: True
 
 - name: Install Nginx on Debian/Ubuntu
   package:
     name: nginx
     state: present
   when: ansible_os_family == "Debian"
+  become: True
 
 - name: Install Nginx on RedHat/CentOS/Fedora
   package:
     name: nginx
     state: present
   when: ansible_os_family == "RedHat"
+  become: True
 
 - name: Configure Nginx to serve the key
   template:
@@ -76,12 +81,14 @@
     dest: /etc/nginx/conf.d/keyserver.conf
     mode: "0644"
   notify: Reload Nginx
+  become: True
 
 - name: Ensure Nginx is running and enabled
   service:
     name: nginx
     state: started
     enabled: True
+  become: True
 
 - name: Deploy rsyncd configuration
   template:
@@ -89,19 +96,19 @@
     dest: /etc/rsyncd.conf
     mode: "0644"
   notify: Restart rsyncd
+  become: True
 
 - name: Start rsync daemon if not already running
   command: rsync --daemon
   args:
     creates: /var/run/rsyncd.pid
+  become: True
 
 - name: Debug rsync daemon status
   shell: ps aux | grep "[r]sync --daemon"
   register: rsync_status
   changed_when: false
-
-- debug:
-    var: rsync_status.stdout_lines
+  become: True
 
 # Handlers
 - name: Reload Nginx
