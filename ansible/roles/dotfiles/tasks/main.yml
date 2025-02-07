@@ -11,7 +11,7 @@
   file:
     path: "{{ ansible_env.HOME }}/.config"
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 # Copy dotfiles using rsync so that local changes can persist if desired.
 - name: Rsync dotfiles to home directory
@@ -20,5 +20,3 @@
     dest: "{{ ansible_env.HOME }}/"
     archive: True
     delete: no
-    # rsync_opts:
-    #   - "--update"

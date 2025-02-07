@@ -26,7 +26,7 @@
 set -euo pipefail
 
 #############################
-# Parse Arguments
+# Step 1.1: Parse Arguments
 #############################
 ROLE="base"
 VERBOSE=false
@@ -52,7 +52,7 @@ for arg in "$@"; do
 done
 
 #############################
-# Progress Message Functions
+# Step 1.2: Progress Message Functions
 #############################
 progress() {
   if [ "$VERBOSE" = true ]; then
@@ -69,14 +69,14 @@ done_progress() {
 }
 
 #############################
-# Logging Function (unbuffered)
+# Step 1.3: Logging Function (unbuffered)
 #############################
 log() {
   stdbuf -o0 echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
 #############################
-# Retry Function
+# Step 1.4: Retry Function
 #############################
 retry_command() {
   local max_retries=$1
@@ -97,18 +97,13 @@ retry_command() {
 }
 
 #############################
-# Debug: Show EUID
-#############################
-echo "EUID is: $EUID"
-
-#############################
-# Step 2: OS Detection
+# Step 1.5: OS Detection
 #############################
 OS="$(uname -s)"
 log "Detected OS: ${OS}"
 
 #############################
-# Step 2.5: Verify .ssh Directory Exists
+# Step 1.6: Verify .ssh Directory Exists
 #############################
 progress "Verifying .ssh directory"
 if [ -d "${HOME}/.ssh" ]; then
@@ -121,7 +116,7 @@ fi
 done_progress
 
 #############################
-# Step 3: Ensure sudo is installed (if needed)
+# Step 2.1: Ensure sudo is installed (if needed)
 #############################
 progress "Checking sudo installation"
 if [ "$(id -u)" -eq 0 ]; then
@@ -167,7 +162,7 @@ fi
 done_progress
 
 #############################
-# Step 4: Ensure curl is installed (OS-agnostic)
+# Step 2.2: Ensure curl is installed (OS-agnostic)
 #############################
 progress "Checking curl installation"
 if ! command -v curl >/dev/null 2>&1; then
@@ -204,7 +199,7 @@ fi
 done_progress
 
 #############################
-# Step 4.5: Ensure Git is installed (OS-agnostic)
+# Step 2.3: Ensure Git is installed (OS-agnostic)
 #############################
 progress "Checking Git installation"
 if ! command -v git >/dev/null 2>&1; then
@@ -241,7 +236,7 @@ fi
 done_progress
 
 #############################
-# Step 4.75: Ensure rsync is installed (OS-agnostic)
+# Step 2.4: Ensure rsync is installed (OS-agnostic)
 #############################
 progress "Checking rsync installation"
 if ! command -v rsync >/dev/null 2>&1; then
@@ -278,7 +273,7 @@ fi
 done_progress
 
 #############################
-# Step X: Ensure jq is installed (OS-agnostic)
+# Step 2.5: Ensure jq is installed (OS-agnostic)
 #############################
 progress "Checking jq installation"
 if ! command -v jq >/dev/null 2>&1; then
@@ -315,110 +310,7 @@ fi
 done_progress
 
 #############################
-# Step 5: Install Nix (if needed)
-#############################
-# progress "Checking Nix installation"
-# if command -v nix >/dev/null 2>&1; then
-#   NIX_VERSION=$(nix --version 2>/dev/null)
-#   if [[ $NIX_VERSION == nix-* ]] || [ -d "/nix/store" ]; then
-#     log "Nix is already installed: $NIX_VERSION"
-#   else
-#     log "Nix command exists but /nix/store not found; proceeding to install Nix..."
-#     if [[ $EUID -eq 0 ]]; then
-#       log "Installing Nix in multi-user mode..."
-#       progress "Setting up Nix multi-user environment"
-#       log "Running as root. Proceeding with Nix multi-user setup."
-#       if ! getent group nixbld >/dev/null; then
-#         log "Creating group 'nixbld'..."
-#         groupadd -r nixbld
-#       fi
-#
-#       for n in $(seq 1 10); do
-#         USERNAME="nixbld$n"
-#         if ! id "$USERNAME" >/dev/null 2>&1; then
-#           log "Creating build user $USERNAME..."
-#           useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USERNAME"
-#         else
-#           log "Build user $USERNAME already exists."
-#         fi
-#         usermod -a -G nixbld "$USERNAME"
-#       done
-#       log "Nix build users group (nixbld) membership: $(getent group nixbld)"
-#
-#       curl -L https://nixos.org/nix/install | sh
-#     else
-#       log "Installing Nix in single-user mode..."
-#       progress "Setting up Nix multi-user environment"
-#       log "Running as root. Proceeding with Nix multi-user setup."
-#       if ! getent group nixbld >/dev/null; then
-#         log "Creating group 'nixbld'..."
-#         groupadd -r nixbld
-#       fi
-#
-#       for n in $(seq 1 10); do
-#         USERNAME="nixbld$n"
-#         if ! id "$USERNAME" >/dev/null 2>&1; then
-#           log "Creating build user $USERNAME..."
-#           useradd -c "Nix build user $n" -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" "$USERNAME"
-#         else
-#           log "Build user $USERNAME already exists."
-#         fi
-#         usermod -a -G nixbld "$USERNAME"
-#       done
-#       log "Nix build users group (nixbld) membership: $(getent group nixbld)"
-#
-#       export NIX_MULTI_USER_ENABLE=0
-#       if [ ! -d "/nix" ]; then
-#         log "Directory /nix does not exist; attempting to create it using sudo."
-#         sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix
-#       fi
-#       curl -L https://nixos.org/nix/install | sh
-#     fi
-#     if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-#       . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-#     fi
-#   fi
-# else
-#   log "Nix command not found. Installing Nix..."
-#   if [[ $EUID -eq 0 ]]; then
-#     log "Installing Nix in multi-user mode..."
-#     curl -L https://nixos.org/nix/install | sh
-#   else
-#     log "Installing Nix in single-user mode..."
-#     export NIX_MULTI_USER_ENABLE=0
-#     if [ ! -d "/nix" ]; then
-#       log "Directory /nix does not exist; attempting to create it using sudo."
-#       sudo mkdir -m 0755 /nix && sudo chown "$USER" /nix
-#     fi
-#     curl -L https://nixos.org/nix/install | sh
-#   fi
-#   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-#     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-#   fi
-# fi
-# done_progress
-#
-# #############################
-# # Step 5.5: Setup Nix Multi-User Environment (only if running as root)
-# #############################
-#
-# if [[ $EUID -eq 0 ]]; then
-#   if ! pgrep -x nix-daemon >/dev/null; then
-#     log "Starting nix-daemon..."
-#     nix-daemon &
-#     sleep 5
-#   fi
-#
-#   export NIX_REMOTE=daemon
-#   log "Exported NIX_REMOTE=daemon"
-#   done_progress
-# else
-#   log "Not running as root (EUID=$EUID): Skipping Nix multi-user environment setup."
-#   done_progress
-# fi
-
-#############################
-# Step 6: Install Ansible (OS-agnostic)
+# Step 2.6: Ensure Ansible is installed (OS-agnostic)
 #############################
 progress "Checking Ansible installation"
 install_ansible() {
@@ -471,7 +363,7 @@ install_ansible
 done_progress
 
 #############################
-# Step 7: Install GitHub CLI (gh) - OS-Agnostic
+# Step 2.7: Install GitHub CLI (gh) - OS-Agnostic
 #############################
 progress "Checking GitHub CLI (gh) installation"
 if ! command -v gh >/dev/null 2>&1; then
@@ -514,39 +406,7 @@ fi
 done_progress
 
 #############################
-# Step 7.1: Setup brewuser for Homebrew on Linux (if running as root)
-#############################
-# if [[ $OS == "Linux" && "$(id -u)" -eq 0 ]]; then
-#   progress "Ensuring brewuser exists and has access to /home/linuxbrew/.linuxbrew"
-#   if ! id brewuser >/dev/null 2>&1; then
-#     log "Creating brewuser..."
-#     useradd -m -s /bin/bash brewuser
-#   else
-#     log "brewuser already exists."
-#   fi
-#   # Ensure /home/linuxbrew/.linuxbrew exists and is owned by brewuser.
-#   if [ ! -d "/home/linuxbrew/.linuxbrew" ]; then
-#     log "Creating /home/linuxbrew/.linuxbrew directory..."
-#     mkdir -p /home/linuxbrew/.linuxbrew
-#   fi
-#   log "Setting ownership of /home/linuxbrew/.linuxbrew to brewuser..."
-#   chown -R brewuser:brewuser /home/linuxbrew/.linuxbrew
-#   done_progress
-# fi
-
-#############################
-# Step 7.2: Install Homebrew as brewuser on Linux (if running as root)
-#############################
-# if ! command -v brew >/dev/null 2>&1; then
-#   if [[ $OS == "Linux" && "$(id -u)" -eq 0 ]]; then
-#     progress "Installing Homebrew as brewuser on Linux"
-#     sudo -u brewuser env HOME=/home/brewuser HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-#     done_progress
-#   fi
-# fi
-
-#############################
-# Step 7.3: Install GitHub CLI authentication check (GH token prompt)
+# Step 3.1: Keyserver-Specific: GitHub CLI authentication check (GH token prompt)
 #############################
 
 if [ "$ROLE" == "keyserver" ]; then
@@ -570,41 +430,7 @@ if [ "$ROLE" == "keyserver" ]; then
 fi
 
 #############################
-# Step 8: Fetch GitHub SSH Private Key via rsync (if not keyserver)
-#############################
-if [ "$ROLE" != "keyserver" ]; then
-  progress "Fetching GitHub SSH private key via rsync"
-  GITHUB_KEY_URL="rsync://192.168.1.8/keys/id_ecdsa_github"
-  mkdir -p "${HOME}/.ssh"
-  chmod 700 "${HOME}/.ssh"
-  PRIVATE_KEY_DEST="${HOME}/.ssh/id_ecdsa_github"
-
-  retry_command 5 10 rsync -avz "${GITHUB_KEY_URL}" /tmp/github_key
-  if [ $? -ne 0 ]; then
-    log "Error: Unable to fetch GitHub SSH private key from ${GITHUB_KEY_URL} after retries."
-    exit 1
-  fi
-
-  if [ -f "${PRIVATE_KEY_DEST}" ]; then
-    if cmp -s /tmp/github_key "${PRIVATE_KEY_DEST}"; then
-      log "GitHub SSH private key is already up-to-date."
-    else
-      cp /tmp/github_key "${PRIVATE_KEY_DEST}"
-      log "GitHub SSH private key updated at ${PRIVATE_KEY_DEST}."
-    fi
-  else
-    cp /tmp/github_key "${PRIVATE_KEY_DEST}"
-    log "GitHub SSH private key installed at ${PRIVATE_KEY_DEST}."
-  fi
-  chmod 600 "${PRIVATE_KEY_DEST}"
-  done_progress
-else
-  log "Role is 'keyserver'. Skipping GitHub SSH private key fetch."
-  done_progress
-fi
-
-#############################
-# Step 9: Keyserver-Specific: Generate ECDSA SSH Key Pair, Test SSH Access, and Update GitHub Key if Denied
+# Step 3.2: Keyserver-Specific: Generate ECDSA SSH Key Pair, Test SSH Access, and Update GitHub Key if Denied
 #############################
 if [ "$ROLE" == "keyserver" ]; then
   progress "Generating ECDSA SSH key pair for keyserver"
@@ -661,7 +487,41 @@ if [ "$ROLE" == "keyserver" ]; then
 fi
 
 #############################
-# Step 10: Run ansible-pull to Provision the System
+# Step 4: Fetch GitHub SSH Private Key via rsync (if not keyserver)
+#############################
+if [ "$ROLE" != "keyserver" ]; then
+  progress "Fetching GitHub SSH private key via rsync"
+  GITHUB_KEY_URL="rsync://192.168.1.8/keys/id_ecdsa_github"
+  mkdir -p "${HOME}/.ssh"
+  chmod 700 "${HOME}/.ssh"
+  PRIVATE_KEY_DEST="${HOME}/.ssh/id_ecdsa_github"
+
+  retry_command 5 10 rsync -avz "${GITHUB_KEY_URL}" /tmp/github_key
+  if [ $? -ne 0 ]; then
+    log "Error: Unable to fetch GitHub SSH private key from ${GITHUB_KEY_URL} after retries."
+    exit 1
+  fi
+
+  if [ -f "${PRIVATE_KEY_DEST}" ]; then
+    if cmp -s /tmp/github_key "${PRIVATE_KEY_DEST}"; then
+      log "GitHub SSH private key is already up-to-date."
+    else
+      cp /tmp/github_key "${PRIVATE_KEY_DEST}"
+      log "GitHub SSH private key updated at ${PRIVATE_KEY_DEST}."
+    fi
+  else
+    cp /tmp/github_key "${PRIVATE_KEY_DEST}"
+    log "GitHub SSH private key installed at ${PRIVATE_KEY_DEST}."
+  fi
+  chmod 600 "${PRIVATE_KEY_DEST}"
+  done_progress
+else
+  log "Role is 'keyserver'. Skipping GitHub SSH private key fetch."
+  done_progress
+fi
+
+#############################
+# Step 5: Run ansible-pull to Provision the System
 #############################
 
 progress "Running ansible-pull"
