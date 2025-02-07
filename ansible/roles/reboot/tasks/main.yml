@@ -1,0 +1,14 @@
+---
+# Put anything in here that needs a reboot after running
+
+- name: Start zsh shell mise
+  shell: zsh
+
+- name: Mise install
+  shell: mise install
+
+- name: Reboot the host
+  shell: "shutdown -r now"
+  become: True
+  async: 0
+  poll: 0
