@@ -105,12 +105,6 @@
   become: True
   when: sudo_user != ""
 
-- name: Run 'mise install' command
-  shell: /home/linuxbrew/.linuxbrew/bin/mise install
-  register: mise_use_result
-  changed_when: false
-  when: host_role | default('base') != "keyserver"
-
 - name: Install qemu-guest-agent if running in a QEMU/KVM virtual machine
   package:
     name: qemu-guest-agent
@@ -118,14 +112,25 @@
   when: (ansible_virtualization_role == "guest") and (ansible_virtualization_type in ["qemu", "kvm"])
   become: True
 
+- name: Ensure /etc/cloud/cloud.cfg.d exists on Ubuntu
+  become: true
+  file:
+    path: /etc/cloud/cloud.cfg.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: ansible_distribution == "Ubuntu"
+
 - name: Disable cloud-init datasource on Ubuntu
-  become: True
+  become: true
   copy:
     content: "datasource_list: [ None ]\n"
     dest: /etc/cloud/cloud.cfg.d/90_dpkg.cfg
     owner: root
     group: root
     mode: "0644"
+    force: no
   when: ansible_distribution == "Ubuntu"
 
 - name: Purge cloud-init package on Ubuntu
@@ -164,3 +169,49 @@
     name: open-iscsi.service
     enabled: no
     state: stopped
+
+# Ensure the default update-motd scripts have the desired permissions
+
+- name: Set permissions on update-motd scripts
+  become: true
+  file:
+    path: "{{ motd_script }}"
+    mode: "0644"
+  loop:
+    - /etc/update-motd.d/10-help-text
+    - /etc/update-motd.d/50-motd-news
+    - /etc/update-motd.d/50-landscape-sysinfo
+    - /etc/update-motd.d/85-fwupd
+    - /etc/update-motd.d/90-updates-available
+    - /etc/update-motd.d/91-contract-ua-esm-status
+    - /etc/update-motd.d/91-release-upgrade
+    - /etc/update-motd.d/92-unattended-upgrades
+    - /etc/update-motd.d/95-hwe-eol
+    - /etc/update-motd.d/95-hwe-eol
+    - /etc/update-motd.d/97-overlayroot
+    - /etc/update-motd.d/98-fsck-at-reboot
+    - /etc/update-motd.d/98-reboot-required
+  loop_control:
+    loop_var: motd_script
+  when: ansible_distribution == "Ubuntu"
+
+# Install figlet so that it can be used to display the hostname
+- name: Ensure figlet is installed
+  become: True
+  apt:
+    name: figlet
+    state: present
+  when: ansible_distribution == "Ubuntu"
+
+# Create a new update-motd script that displays the hostname using figlet
+- name: Create /etc/update-motd.d/05-hostname to display hostname with figlet
+  become: True
+  copy:
+    dest: /etc/update-motd.d/05-hostname
+    content: |
+      #!/bin/sh
+      figlet -f slant {{ ansible_hostname }}
+    owner: root
+    group: root
+    mode: "0755"
+  when: ansible_distribution == "Ubuntu"
