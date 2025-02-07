@@ -3,6 +3,27 @@
 
 # Ensure rsync is installed for different operating systems.
 
+- name: Ensure kitty-terminfo is installed on Debian/Ubuntu
+  apt:
+    name: kitty-terminfo
+    state: present
+  when: ansible_os_family == "Debian"
+  become: True
+
+- name: Ensure kitty-terminfo is installed on RedHat/CentOS
+  yum:
+    name: kitty-terminfo
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: True
+
+- name: Ensure kitty-terminfo is installed on macOS
+  homebrew:
+    name: kitty-terminfo
+    state: present
+  when: ansible_os_family == "Darwin"
+  become: True
+
 - name: Ensure rsync is installed on Debian/Ubuntu
   package:
     name: rsync
