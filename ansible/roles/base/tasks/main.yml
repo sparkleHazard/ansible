@@ -8,14 +8,14 @@
     name: rsync
     state: present
   when: ansible_os_family == "Debian"
-  become: yes
+  become: True
 
 - name: Ensure rsync is installed on RedHat/CentOS/Fedora
   package:
     name: rsync
     state: present
   when: ansible_os_family == "RedHat"
-  become: yes
+  become: True
 
 - name: Ensure rsync is installed on macOS using Homebrew
   community.general.homebrew:
@@ -33,7 +33,7 @@
       - htop
     state: latest
   when: ansible_os_family not in ["Darwin", "Linux"]
-  become: yes
+  become: True
 
 # Ensure zsh is installed
 
@@ -42,21 +42,21 @@
     name: zsh
     state: present
   when: ansible_os_family == "Debian"
-  become: yes
+  become: True
 
 - name: Install zsh on RedHat/CentOS/Fedora
   package:
     name: zsh
     state: present
   when: ansible_os_family == "RedHat"
-  become: yes
+  become: True
 
 - name: Install zsh on Darwin (macOS) using Homebrew
   community.general.homebrew:
     name: zsh
     state: present
   when: ansible_os_family == "Darwin"
-  become: yes
+  become: True
 
 # Set the default shell to zsh for the target user
 #
@@ -72,7 +72,7 @@
     # If not defined elsewhere, default to ansible_env.USER
     target_user: "{{ (ansible_env.USER | default('')) | lower }}"
   when: target_user != 'root' and target_user != ""
-  become: yes
+  become: True
 
 - name: Enable passwordless sudo for target user (if not root)
   copy:
@@ -81,7 +81,7 @@
     owner: root
     group: root
     mode: "0440"
-  become: yes
+  become: True
   when: sudo_user != ""
 
 - name: Run 'mise install' command

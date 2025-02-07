@@ -18,7 +18,7 @@
   synchronize:
     src: "{{ role_path }}/files/dotfiles/"
     dest: "{{ ansible_env.HOME }}/"
-    archive: yes
+    archive: True
     delete: no
     # rsync_opts:
     #   - "--update"

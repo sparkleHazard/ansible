@@ -81,7 +81,7 @@
   service:
     name: nginx
     state: started
-    enabled: yes
+    enabled: True
 
 - name: Deploy rsyncd configuration
   template:

@@ -3,7 +3,7 @@
   set_fact:
     sudo_user: "{{ ansible_env.USER | default('') }}"
   when: ansible_env.USER is defined and ansible_env.USER != "root"
-  become: yes
+  become: True
 
 # Check if running as root and Homebrew is not installed
 - name: Check if Homebrew is installed
@@ -17,7 +17,7 @@
 - name: Check if brewuser exists
   command: id -u brewuser
   register: brewuser_exists
-  ignore_errors: yes
+  ignore_errors: True
   changed_when: false
 
 - name: Create brewuser for Homebrew installation if not present
@@ -25,7 +25,7 @@
     name: brewuser
     state: present
     shell: /bin/bash
-  become: yes
+  become: True
   when:
     - ansible_user_id == "root"
     - brew_check.rc != 0
@@ -37,7 +37,7 @@
     owner: root
     group: root
     mode: "0440"
-  become: yes
+  become: True
   when: brewuser_exists.rc == 0
 
 #Install Homebrew using brewuser if running as root and Homebrew is not installed

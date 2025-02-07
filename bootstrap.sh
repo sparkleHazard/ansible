@@ -56,9 +56,9 @@ done
 #############################
 progress() {
   if [ "$VERBOSE" = true ]; then
-    echo "==> $@"
+    echo "==> $*"
   else
-    echo -n "==> $@ ... "
+    echo -n "==> $* ... "
   fi
 }
 

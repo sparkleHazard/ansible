@@ -1,29 +1,35 @@
 ---
-- name: Apply base, common and homebrew configuration
+- name: Apply base Linux configuration
   hosts: localhost
-  gather_facts: yes
-  roles:
-    - homebrew
-    - base
-    - common
+  gather_facts: True
+  tasks:
+    - name: Include base Linux roles
+      include_role:
+        name: "{{ item }}"
+      loop:
+        - homebrew
+        - base
+        - dotfiles
+      when: host_role | default('base') == "base" and ansible_system == "Linux"
 
-- name: Apply role-specific configuration
+- name: Apply keyserver configuration
   hosts: localhost
-  gather_facts: yes
+  gather_facts: True
   tasks:
     - include_role:
         name: keyserver
-      when: host_role | default('base') == "keyserver"
-    - include_role:
-        name: webserver
-      when: host_role | default('base') == "webserver"
-  become: yes
+      when: host_role | default('base') == "keyserver" and ansible_system == "Linux"
 
-- name: Provision MacOS-Specific Configuration
+- name: Apply base MacOS Configuration
   hosts: localhost
-  gather_facts: yes
+  gather_facts: True
   tasks:
-    - name: Include macos role if running on Darwin
+    - name: Include base MacOS roles
       include_role:
-        name: macos
-      when: ansible_system == "Darwin"
+        name: "{{ item }}"
+      loop:
+        - macos
+        - homebrew
+        - base
+        - dotfiles
+      when: (host_role | default('base')) == 'base' and ansible_system == "Darwin"
