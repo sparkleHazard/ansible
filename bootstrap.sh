@@ -539,3 +539,38 @@ ansible-pull -U "git@github.com:sparkleHazard/bootstrap.git" \
 done_progress
 
 log "Bootstrapping complete."
+
+#############################
+# Step 6: Create one-shot systemd service for mise install
+#############################
+
+progress "Creating one-shot systemd service for mise install"
+
+# Determine the target user (the user who invoked the script)
+TARGET_USER=${SUDO_USER:-$USER}
+# Determine the home directory for that user:
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
+cat <<EOF | sudo tee /etc/systemd/system/mise-install-once.service
+[Unit]
+Description=Run mise install once after reboot
+After=network.target
+
+[Service]
+Type=oneshot
+User=${TARGET_USER}
+Environment=HOME=${TARGET_HOME}
+ExecStart=/bin/zsh -i -c "/home/linuxbrew/.linuxbrew/bin/mise install"
+ExecStartPost=/bin/systemctl disable mise-install-once.service && /bin/rm -f /etc/systemd/system/mise-install-once.service && /bin/systemctl daemon-reload
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd configuration and enable the service
+sudo systemctl daemon-reload
+sudo systemctl enable mise-install-once.service
+
+# Reboot the system
+log "Rebooting the system so that the one-shot service can run..."
+sudo reboot
