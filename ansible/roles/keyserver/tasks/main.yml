@@ -17,7 +17,7 @@
   register: key_stat
 
 - name: Generate ECDSA SSH key pair for keyserver (if not exists)
-  command: ssh-keygen -t ecdsa -b 521 -f "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github" -N ""
+  command: ssh-keygen -t ecdsa -b 521 -f "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github" -N "" -C ""
   when: not key_stat.stat.exists
 
 - name: Read generated public key
@@ -51,13 +51,12 @@
     src: "{{ playbook_dir }}/../bootstrap.sh"
     dest: /var/www/html/bootstrap.sh
     mode: "0755"
+  become: True
 
 - name: Copy generated SSH public key to serving directory
   copy:
     src: "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github"
     dest: /var/www/keys/id_ecdsa_github
-    owner: root
-    group: root
     mode: "0644"
   become: True
 
@@ -115,3 +114,4 @@
   service:
     name: nginx
     state: reloaded
+  become: True

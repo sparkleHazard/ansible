@@ -438,7 +438,7 @@ if [ "$ROLE" == "keyserver" ]; then
   chmod 700 "${HOME}/.ssh"
   KEY_PATH="${HOME}/.ssh/id_ecdsa_github"
   if [ ! -f "${KEY_PATH}" ]; then
-    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -q
+    ssh-keygen -t ecdsa -b 521 -f "${KEY_PATH}" -N "" -q -C ""
     log "ECDSA key pair generated at ${KEY_PATH}."
     NEW_KEY=true
   else
