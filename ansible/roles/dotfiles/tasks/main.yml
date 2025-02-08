@@ -4,7 +4,7 @@
   command: git submodule update --remote --merge
   args:
     chdir: "{{ role_path }}/files/dotfiles"
-  when: dotfiles_update | default(true)
+  when: dotfiles_update | default(True)
 
 # Ensure the target directories exist
 - name: Ensure ~/.config directory exists

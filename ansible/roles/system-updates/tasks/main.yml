@@ -1,0 +1,87 @@
+---
+# roles/system-updates/tasks/main.yml
+
+# Debian/Ubuntu: Configure GitHub CLI repository key and update system packages.
+- block:
+    - name: Check if GitHub CLI keyring file exists
+      stat:
+        path: /usr/share/keyrings/githubcli-archive-keyring.gpg
+      register: gh_key_stat
+
+    - name: Install GitHub CLI apt key if missing
+      command: >
+        sh -c "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg"
+      when: not gh_key_stat.stat.exists
+
+    - name: Set permissions on GitHub CLI apt key
+      file:
+        path: /usr/share/keyrings/githubcli-archive-keyring.gpg
+        mode: "0644"
+
+    - name: Configure GitHub CLI repository
+      copy:
+        dest: /etc/apt/sources.list.d/github-cli.list
+        content: "deb [arch={{ ansible_architecture }} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n"
+        owner: root
+        group: root
+        mode: "0644"
+  become: true
+  when: ansible_os_family == "Debian"
+
+- block:
+    - name: Update apt cache on Debian/Ubuntu
+      apt:
+        update_cache: yes
+
+    - name: Upgrade all apt packages on Debian/Ubuntu
+      apt:
+        upgrade: dist
+
+    - name: Install build-essential on Debian/Ubuntu
+      apt:
+        name: build-essential
+        state: present
+  become: true
+  when: ansible_os_family == "Debian"
+
+# RedHat/CentOS: Update packages and install the Development Tools group.
+- block:
+    - name: Update yum packages on RedHat/CentOS
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Install Development Tools group on RedHat/CentOS
+      yum:
+        name: "@Development Tools"
+        state: present
+  become: true
+  when: ansible_os_family == "RedHat" and ansible_distribution != "Fedora"
+
+# Fedora: Update packages and install the Development Tools group.
+- block:
+    - name: Update dnf packages on Fedora
+      dnf:
+        name: "*"
+        state: latest
+
+    - name: Install Development Tools group on Fedora
+      dnf:
+        name: "@development-tools"
+        state: present
+  become: true
+  when: ansible_distribution == "Fedora"
+
+# macOS: Update Homebrew and install common build tools.
+- block:
+    - name: Update Homebrew on macOS
+      homebrew:
+        update_homebrew: yes
+
+    - name: Install build tools on macOS using Homebrew
+      homebrew:
+        name:
+          - gcc
+          - make
+        state: present
+  when: ansible_os_family == "Darwin"

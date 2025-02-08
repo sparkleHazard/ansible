@@ -12,6 +12,7 @@
         - homebrew
         - base
         - dotfiles
+        - system-updates
       when: host_role | default('base') == "base" and ansible_system == "Linux"
 
 - name: Apply keyserver configuration
@@ -28,6 +29,7 @@
         - base
         - dotfiles
         - keyserver
+        - system-updates
       when: host_role | default('base') == "keyserver" and ansible_system == "Linux"
 
 - name: Apply base MacOS Configuration
@@ -44,4 +46,5 @@
         - homebrew
         - base
         - dotfiles
+        - system-updates
       when: (host_role | default('base')) == 'base' and ansible_system == "Darwin"

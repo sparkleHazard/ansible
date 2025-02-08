@@ -113,7 +113,7 @@
   become: True
 
 - name: Ensure /etc/cloud/cloud.cfg.d exists on Ubuntu
-  become: true
+  become: True
   file:
     path: /etc/cloud/cloud.cfg.d
     state: directory
@@ -123,7 +123,7 @@
   when: ansible_distribution == "Ubuntu"
 
 - name: Disable cloud-init datasource on Ubuntu
-  become: true
+  become: True
   copy:
     content: "datasource_list: [ None ]\n"
     dest: /etc/cloud/cloud.cfg.d/90_dpkg.cfg
@@ -173,7 +173,7 @@
 # Ensure the default update-motd scripts have the desired permissions
 
 - name: Set permissions on update-motd scripts
-  become: true
+  become: True
   file:
     path: "{{ motd_script }}"
     mode: "0644"

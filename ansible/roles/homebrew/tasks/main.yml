@@ -26,7 +26,7 @@
 
 - name: Update Homebrew
   homebrew:
-    update_homebrew: true
+    update_homebrew: True
   when:
     - ansible_system in ["Linux", "Darwin"]
     - ansible_user_id != "root"
