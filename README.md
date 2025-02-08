@@ -1,77 +1,112 @@
-# Bootstrap
+# Ansible Configuration Repository
 
-A self-contained, OS-agnostic provisioning repository for bootstrapping and configuring new systems using ansible‑pull, Nix, Home Manager, and your dotfiles.
+This repository contains an Ansible-based configuration management solution for provisioning and maintaining servers in an OS-agnostic manner. It is designed to work with both the pull model (using `ansible-pull`) and the traditional push model (using `ansible-playbook`).
 
-This repository provides a one‑step method to get a new machine up and running. By running a single bootstrap command (via curl piping into bash), the system will automatically:
+## Features
 
-- Install prerequisites (Nix, Ansible, Home Manager) in an OS‑agnostic way.
-- Fetch an approved SSH key from a local key server.
-- Pull down your provisioning repository from GitHub.
-- Run an ansible‑pull based playbook that applies roles based on a role argument (e.g. base, webserver, etc.).
-- Deploy your dotfiles (stored as a submodule) using rsync so that local changes can be tested if needed.
+- **OS-Agnostic System Updates & Package Management:**
 
-## Overview
+  - Automatically update system packages and install essential development tools.
+  - Installs `build-essential` on Debian/Ubuntu, development tools on RedHat/CentOS/Fedora, and common build tools on macOS via Homebrew.
 
-This repository is designed to be used as a bootstrap or provisioning repo. It supports:
-- **Self-Provisioning via ansible‑pull:**  
-  Each new machine pulls its configuration locally. There’s no need for a centralized, static inventory file.
-- **OS-Agnostic Prerequisite Installation:**  
-  The bootstrap script detects your operating system (Linux or macOS) and installs Nix, Ansible, and Home Manager using the appropriate package manager or installer.
-- **Modular Roles:**  
-  The repository includes roles for base system configuration, common dotfiles distribution, and role‑specific tasks (e.g. webserver configuration). Roles can be controlled via a command‑line argument when bootstrapping.
-- **Easy Extensibility:**  
-  Add new roles by creating a new role directory under `ansible/roles` and update your playbook to conditionally include them based on variables.
+- **Custom Roles:**
 
-## Directory Structure
+  - **base:** Basic configuration for all servers.
+  - **keyserver:** Specialized configuration for keyserver deployments (including GitHub SSH key management).
+  - **system-updates:** Contains tasks for updating the system and installing prerequisites across multiple OS families.
+  - Additional roles can be added as needed.
 
-```
-bootstrap/ ├── ansible │   ├── inventory.yml # (Not strictly needed with ansible-pull; defaults to localhost) │   ├── playbooks │   │   └── site.yml # Main playbook that includes roles based on a host variable (e.g., host_role) │   └── roles │   ├── base # Base role: common system configuration (OS-agnostic package updates via Homebrew) │   │   └── tasks │   │   └── main.yml │   ├── common # Common role: deploy dotfiles from a submodule using rsync │   │   ├── files │   │   │   └── dotfiles # Git submodule pointing to your dotfiles repository │   │   └── tasks │   │   └── main.yml │   └── webserver # Webserver role: tasks specific to a web server (optional) │   └── tasks │   └── main.yml ├── nix │   └── flake.nix # Home Manager/NixOS configuration for a reproducible environment └── bootstrap.sh # OS-agnostic bootstrap script that accepts arguments (e.g., --role=webserver)
+- **Cloud-init and MOTD Customizations (Optional):**
+
+  - Remove cloud-init from Ubuntu.
+  - Customize the Message of the Day (MOTD) – for example, displaying the hostname in a stylized format using figlet.
+
+- **Integration with GitHub CLI and Ansible Vault:**
+
+  - Manage SSH keys on GitHub using the GitHub CLI (`gh`) and update them as needed.
+  - Use Ansible Vault to secure sensitive variables (e.g., sudo/become passwords).
+
+- **One-Shot Systemd Service for Post-Reboot Tasks:**
+  - Optionally configure a one-shot systemd service (triggered via a bootstrap script argument) to run commands like `mise install` once after a reboot.
+
+## Repository Structure
+
+```plaintext
+ansible/
+├── group_vars/            # Group variable files (can include vaulted files)
+├── host_vars/             # Host-specific variables
+├── roles/
+│   ├── base/              # Basic server configuration tasks
+│   ├── keyserver/         # Keyserver-specific configuration (SSH key management, etc.)
+│   ├── system-updates/    # OS-agnostic system update and development tools installation
+│   └── [other roles...]
+└── site.yml               # Main playbook that includes roles based on extra-vars
 ```
 
 ## Usage
 
-### Bootstrapping a New Machine
+### Using `ansible-pull`
 
-To bootstrap a new system, simply run the following one‑liner (make sure the provisioning server is set up to serve `bootstrap.sh`):
+You can bootstrap a new server by running ansible-pull from the target host. For example:
 
 ```bash
-curl -sSL https://provisioning-server.local/bootstrap.sh | bash -s -- --role=webserver
+ansible-pull -U "git@github.com:sparkleHazard/ansible.git" \
+  -i "localhost," \
+  --extra-vars "host_role=base" \
+  --private-key /path/to/your/private/key \
+  --accept-host-key \
+  --vault-password-file ~/.vault_pass.txt \
+  ansible/site.yml
 ```
 
-Replace webserver with the desired role (for example, base or any custom role you define). If no role is specified, the default is base.
-### What the Bootstrap Script Does
+### Using `ansible-playbook`
 
-- OS Detection & Prerequisite Installation:
-  - Detects your operating system and installs Nix, Ansible (using apt, dnf, Homebrew, or pip as appropriate), and Home Manager via Nix.
-  - SSH Key Distribution:
-      Downloads an approved SSH key from your local key server and appends it to your ~/.ssh/authorized_keys.
-  - ansible‑pull Invocation:
-      Runs ansible‑pull to clone/update the provisioning repository and execute the main playbook (ansible/playbooks/site.yml), passing the host_role extra variable so that the correct roles are applied.
+Alternatively, you can run the playbook in a push model from your control machine:
 
-## Role Customization
+```bash
+ansible-playbook -i inventory.ini site.yml \
+  --extra-vars "host_role=keyserver" \
+  --vault-password-file ~/.vault_pass.txt
+```
 
-- Base Role:
-    The base role (in ansible/roles/base) is OS‑agnostic. It first updates system packages (using Homebrew on macOS and Linux) and installs common packages defined in variables.
-- Common Role:
-    The common role (in ansible/roles/common) updates the dotfiles submodule and deploys your configuration files to your home directory using rsync (with the --update flag so local modifications can be preserved for testing).
-- Webserver Role:
-    The webserver role (in ansible/roles/webserver) contains tasks specific to web servers. Additional roles can be added by following the same pattern.
+### Bootstrap Script
 
-## Extending the System
+A separate bootstrap script is provided (see [bootstrap.sh](https://github.com/sparkleHazard/ansible/blob/main/bootstrap.sh)) that:
 
-You can add new roles by:
+- Installs prerequisites (sudo, curl, Git, rsync, jq, Ansible, GitHub CLI)
+- Ensures that the ~/.ssh directory exists
+- Manages GitHub SSH keys (for keyserver roles)
+- Runs ansible-pull to provision the system
+- Optionally sets up a one-shot systemd service to run /home/linuxbrew/.linuxbrew/bin/mise install after reboot (using the --mise-install flag)
 
-- Creating a new directory under `ansible/roles` (e.g., `database`).
-- Writing tasks in `ansible/roles/database/tasks/main.yml`.
-- Updating your main playbook (`ansible/playbooks/site.yml`) to conditionally  include the new role based on a variable (for example, using a when: `host_role == "database"` condition) or by using multiple plays for different groups.
+Prerequisites
 
-## Contributing
+- Ansible: Version 2.9 or higher (tested with Ansible 2.14)
+- Python: Python 3.x (required by Ansible)
+- SSH: Proper SSH keys for repository access and host communication
+- Vault: (Optional) A vault password file if you’re using Ansible Vault to secure sensitive variables
+  - OS-Specific Requirements:
+  - Debian/Ubuntu systems must have access to appropriate repositories.
+  - RedHat/CentOS/Fedora systems should have the necessary repository configurations.
+  - macOS should have Homebrew installed for package management.
 
-Contributions are welcome! If you have suggestions or improvements for this bootstrapping system, please open an issue or submit a pull request.
-License
+### Contributing
 
-This project is licensed under the MIT License. See LICENSE for details.
+Contributions are welcome! Please open issues or submit pull requests for:
+
+- Improvements and new features
+- Bug fixes and documentation enhancements
+
+### License
+
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/sparkleHazard/ansible/blob/main/README.md) file for details.
 
 ---
 
-This README provides an overview of the repository, explains how to use the bootstrap script (including passing a role as an argument), outlines the directory structure, and describes how to extend or customize the provisioning. Feel free to modify any section to better fit your exact setup.
+### Final Notes
+
+- **Customization:** Adjust repository URLs, package names, and paths as needed for your environment.
+- **Testing:** Ensure you test both `ansible-pull` and `ansible-playbook` modes to confirm that all roles and tasks behave as expected.
+- **Documentation:** Keep the README updated as new roles or features are added to the repository.
+
+Let me know if you need any further modifications or additional sections in the README!
