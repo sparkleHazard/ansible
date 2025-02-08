@@ -24,7 +24,7 @@ set -euo pipefail
 #############################
 # Configuration Variables
 #############################
-REPO_URL="git@github.com:sparkleHazard/bootstrap.git"
+REPO_URL="git@github.com:sparkleHazard/ansible.git"
 VAULT_PASS_FILE="$HOME/.vault_pass.txt"
 ANSIBLE_SITE="ansible/site.yml"
 # The path for mise install command:
