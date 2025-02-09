@@ -22,7 +22,6 @@
     name: kitty-terminfo
     state: present
   when: ansible_os_family == "Darwin"
-  become: True
 
 - name: Ensure rsync is installed on Debian/Ubuntu
   package:
@@ -77,7 +76,6 @@
     name: zsh
     state: present
   when: ansible_os_family == "Darwin"
-  become: True
 
 # Set the default shell to zsh for the target user
 #
