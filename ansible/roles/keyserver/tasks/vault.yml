@@ -1,0 +1,95 @@
+---
+# Ensure Vault is installed.
+- name: Install Vault on Debian/Ubuntu
+  apt:
+    name: vault
+    state: present
+  become: true
+  when: ansible_os_family == "Debian"
+
+# Create the Vault configuration directory.
+- name: Create Vault configuration directory
+  file:
+    path: /etc/vault
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+# Write the Vault configuration file with Transit auto-unseal.
+- name: Write vault.hcl configuration for auto-unseal
+  copy:
+    dest: /etc/vault/vault.hcl
+    content: |
+      storage "file" {
+        path = "/opt/vault/data"
+      }
+
+      listener "tcp" {
+        address     = "127.0.0.1:8200"
+        tls_disable = 1
+      }
+
+      seal "transit" {
+        address    = "http://127.0.0.1:8200"
+        mount_path = "transit"
+        key_name   = "autounseal-key"
+      }
+
+      api_addr = "http://127.0.0.1:8200"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+# Ensure the Vault data directory exists.
+- name: Create Vault data directory
+  file:
+    path: /opt/vault/data
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+# Ensure Vault is started and enabled.
+- name: Enable and start Vault service
+  systemd:
+    name: vault
+    enabled: yes
+    state: started
+  become: true
+
+# Wait for Vault to become responsive.
+- name: Wait for Vault health check
+  uri:
+    url: "http://127.0.0.1:8200/v1/sys/health"
+    status_code: 200
+  register: vault_health
+  retries: 10
+  delay: 5
+  until: vault_health.status == 200
+  become: true
+
+# Initialize Vault if it is not already initialized.
+- name: Initialize Vault
+  command: vault operator init -key-shares=1 -key-threshold=1 -format=json
+  register: vault_init
+  changed_when: vault_init.stdout is defined and vault_init.stdout|from_json is defined
+  failed_when: vault_init.rc != 0 and "'already initialized'" not in vault_init.stderr
+  become: true
+
+# Enable the Transit secrets engine (if not already enabled).
+- name: Enable Transit secrets engine
+  command: vault secrets enable transit
+  args:
+    creates: /opt/vault/data/transit
+  become: true
+
+# Create the auto-unseal key if it doesn't exist.
+- name: Create auto-unseal key in Transit
+  command: vault write -f transit/keys/autounseal-key
+  args:
+    creates: /opt/vault/data/transit/keys/autounseal-key.json
+  become: true
