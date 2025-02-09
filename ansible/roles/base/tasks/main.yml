@@ -17,12 +17,6 @@
   when: ansible_os_family == "RedHat"
   become: True
 
-- name: Ensure kitty-terminfo is installed on macOS
-  homebrew:
-    name: kitty-terminfo
-    state: present
-  when: ansible_os_family == "Darwin"
-
 - name: Ensure rsync is installed on Debian/Ubuntu
   package:
     name: rsync
