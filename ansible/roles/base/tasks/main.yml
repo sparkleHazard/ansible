@@ -87,16 +87,6 @@
   when: target_user != 'root' and target_user != ""
   become: True
 
-- name: Enable passwordless sudo for target user (if not root)
-  copy:
-    content: "{{ sudo_user }} ALL=(ALL) NOPASSWD: ALL"
-    dest: "/etc/sudoers.d/{{ sudo_user }}"
-    owner: root
-    group: root
-    mode: "0440"
-  become: True
-  when: sudo_user != ""
-
 - name: Install qemu-guest-agent if running in a QEMU/KVM virtual machine
   package:
     name: qemu-guest-agent
