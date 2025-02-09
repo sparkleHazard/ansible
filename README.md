@@ -90,6 +90,24 @@ Prerequisites
   - RedHat/CentOS/Fedora systems should have the necessary repository configurations.
   - macOS should have Homebrew installed for package management.
 
+### Workflow
+
+```mermaid
+flowchart TD
+    A[Start: ansible-pull invoked] --> B[Checkout repository]
+    B --> C[Load extra-vars which in this case is the role requested]
+    C --> D{host_role value?}
+    D -- "base" --> E[Include roles: base, homebrew, dotfiles, etc.]
+    D -- "keyserver" --> F[Include keyserver role tasks]
+    D -- Other --> G[Include role-specific tasks]
+    E --> H[Configure system:\n - Update packages\n - Install essentials\n - Configure shell, etc.]
+    F --> I[Configure keyserver:\n - Manage SSH keys\n - Setup Vault / key distribution\n - etc.]
+    G --> J[Apply custom configuration]
+    H --> K[End Playbook]
+    I --> K
+    J --> K
+```
+
 ### Contributing
 
 Contributions are welcome! Please open issues or submit pull requests for:
