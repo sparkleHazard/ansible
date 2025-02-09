@@ -144,6 +144,7 @@
     name: iscsid.service
     enabled: no
     state: stopped
+  when: ansible_distribution == "Ubuntu"
 
 - name: Disable open-iscsi service
   become: True
@@ -151,6 +152,7 @@
     name: open-iscsi.service
     enabled: no
     state: stopped
+  when: ansible_distribution == "Ubuntu"
 
 # Ensure the default update-motd scripts have the desired permissions
 
