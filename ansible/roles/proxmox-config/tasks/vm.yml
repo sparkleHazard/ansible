@@ -1,0 +1,6 @@
+---
+- name: Create VMs that are missing
+  include_tasks: vm_create.yml
+  loop: "{{ vm_definitions }}"
+  loop_control:
+    loop_var: item

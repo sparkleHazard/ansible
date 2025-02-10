@@ -1,0 +1,4 @@
+---
+- import_tasks: vault.yml # (if you already have Vault tasks)
+- import_tasks: vm.yml # Import the tasks to check and create VMs
+- import_tasks: other_tasks.yml # Any other tasks you have for the role

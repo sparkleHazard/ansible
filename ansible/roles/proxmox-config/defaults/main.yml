@@ -1,0 +1,33 @@
+---
+vm_definitions:
+  # Configuration for the "home-assistant" VM (from your first pve config)
+  # - vmid: 100
+  #   name: "home-assistant"
+  #   cores: 14
+  #   memory: 65536
+  #   boot: "scsi0"
+  #   cpu: "host"
+  #   bios: "ovmf"
+  #   agent: 1
+  #   localtime: 1
+  #   net0: "virtio=02:B6:82:47:DF:71,bridge=vmbr0"
+  #   disk: "local-lvm:vm-100-disk-1,discard=on,size=250G,ssd=1"
+  # Optionally include other fields:
+  # description: "Home Assistant OS..."
+  # tags: "proxmox-helper-scripts"
+  # You can also include additional disk definitions if needed
+  # efidisk0: "local-lvm:vm-100-disk-0,efitype=4m,size=4M"
+  # usb: [ "host=10c4:ea60", "host=2357:0604" ]
+
+  # Configuration for the "Ollama" VM (from your second pve config)
+  - vmid: 108
+    name: "Ollama"
+    cores: 10
+    memory: 65000
+    boot: "scsi0;ide2;net0"
+    cpu: "host"
+    hostpci0: "0000:05:00"
+    ide2: "local:iso/ubuntu-22.04.3-live-server-amd64.iso,media=cdrom,size=2083390K"
+    net0: "virtio=BC:24:11:10:79:2C,bridge=vmbr0,firewall=1"
+    disk: "local-lvm:vm-108-disk-0,iothread=1,size=300G"
+    scsihw: "virtio-scsi-single"

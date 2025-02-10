@@ -1,0 +1,15 @@
+---
+- name: Check if VM {{ item.vmid }} exists
+  command: "qm status {{ item.vmid }}"
+  register: vm_status
+  ignore_errors: True
+  changed_when: False
+
+- name: Create VM {{ item.vmid }} if missing
+  command: >
+    qm create {{ item.vmid }}
+    --name "{{ item.name }}"
+    --cores {{ item.cores }}
+    --memory {{ item.memory }}
+    --net0 virtio,bridge=vmbr0
+  when: vm_status.rc != 0
