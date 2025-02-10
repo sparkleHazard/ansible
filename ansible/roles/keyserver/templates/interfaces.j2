@@ -1,0 +1,6 @@
+auto {{ network_interface }}
+iface {{ network_interface }} inet static
+    address {{ static_ip }}
+    netmask {{ "255.255.255.0" if cidr == "24" else "other_netmask" }}
+    gateway {{ gateway }}
+    dns-nameservers {{ dns_primary }} {{ dns_secondary }}

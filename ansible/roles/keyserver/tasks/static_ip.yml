@@ -1,0 +1,38 @@
+- name: Configure static IP on keyserver (Ubuntu with netplan)
+  when: ansible_distribution == "Ubuntu"
+  block:
+    - name: Deploy netplan configuration for static IP
+      template:
+        src: netplan.j2
+        dest: /etc/netplan/01-netcfg.yaml
+      become: True
+
+    - name: Apply netplan configuration
+      command: netplan apply
+      become: True
+
+- name: Deploy Debian static IP configuration
+  template:
+    src: interfaces.j2
+    dest: /etc/network/interfaces.d/static.cfg
+  become: True
+  when: ansible_distribution == "Debian"
+
+- name: Restart networking (Debian)
+  service:
+    name: networking
+    state: restarted
+  become: True
+  when: ansible_distribution == "Debian"
+
+- name: Configure static IP for Raspberry Pi using dhcpcd.conf
+  become: True
+  blockinfile:
+    path: /etc/dhcpcd.conf
+    marker: "# {mark} ANSIBLE STATIC IP CONFIGURATION"
+    block: |
+      interface {{ network_interface }}
+      static ip_address={{ static_ip }}/{{ cidr }}
+      static routers={{ gateway }}
+      static domain_name_servers={{ dns_primary }} {{ dns_secondary }}
+  when: ansible_distribution in ["Raspbian", "Raspberry Pi OS"]

@@ -4,6 +4,7 @@
 # It also prints the public key so that you can add it to GitHub.
 
 # - import_tasks: vault.yml
+- import_tasks: static_ip.yml
 
 - name: Ensure .ssh directory exists
   file:

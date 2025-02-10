@@ -1,0 +1,13 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ network_interface }}:
+      dhcp4: no
+      addresses:
+        - {{ static_ip }}/{{ netmask }}
+      gateway4: {{ gateway }}
+      nameservers:
+        addresses:
+          - {{ dns_primary }}
+          - {{ dns_secondary }}
