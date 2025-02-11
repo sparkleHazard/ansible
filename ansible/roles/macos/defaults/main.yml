@@ -3,6 +3,7 @@ brew_cask_packages:
   - dropbox
   - firefox
   - google-chrome
+  - ghostty
   - iterm2
   - kitty
   - keepassxc
