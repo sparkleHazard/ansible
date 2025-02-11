@@ -1,25 +1,26 @@
 ---
 brew_packages:
-  - git
-  - git-lfs
-  - lazygit
-  - jq
-  - ssh-copy-id
-  - tmux
-  - tree
-  - wget
-  - zsh
-  - neovim
-  - mise
   - btop
-  - gping
-  - ripgrep
-  - topgrade
   - bat
-  - eza
-  - fd
-  - eza
   - duf
   - dust
+  - eza
+  - eza
+  - fd
   - fzf
+  - git
+  - git-lfs
+  - gping
+  - jq
+  - lazygit
+  - mise
+  - neovim
   - nvtop
+  - ripgrep
+  - ssh-copy-id
+  - starship
+  - tmux
+  - tree
+  - topgrade
+  - wget
+  - zsh
