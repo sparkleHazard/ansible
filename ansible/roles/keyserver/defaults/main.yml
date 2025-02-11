@@ -1,5 +1,5 @@
 ---
-network_interface: "eth0" # Adjust as necessary (e.g. eth0, wlan0)
+network_interface: "{{ ansible_default_ipv4.interface | default('eth0') }}"
 static_ip: "192.168.1.8" # Desired static IP address
 cidr: "24" # CIDR notation (24 means 255.255.255.0)
 netmask: "24"
