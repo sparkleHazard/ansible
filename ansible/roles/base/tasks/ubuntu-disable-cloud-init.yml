@@ -1,0 +1,60 @@
+---
+- name: Ensure /etc/cloud/cloud.cfg.d exists on Ubuntu
+  become: True
+  file:
+    path: /etc/cloud/cloud.cfg.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: ansible_distribution == "Ubuntu"
+
+- name: Disable cloud-init datasource on Ubuntu
+  become: True
+  copy:
+    content: "datasource_list: [ None ]\n"
+    dest: /etc/cloud/cloud.cfg.d/90_dpkg.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    force: no
+  when: ansible_distribution == "Ubuntu"
+
+- name: Purge cloud-init package on Ubuntu
+  become: True
+  apt:
+    name: cloud-init
+    purge: True
+    state: absent
+    autoremove: True
+  when: ansible_distribution == "Ubuntu"
+
+- name: Remove /etc/cloud directory
+  become: True
+  file:
+    path: /etc/cloud
+    state: absent
+  when: ansible_distribution == "Ubuntu"
+
+- name: Remove /var/lib/cloud directory
+  become: True
+  file:
+    path: /var/lib/cloud
+    state: absent
+  when: ansible_distribution == "Ubuntu"
+
+- name: Disable iscsid service
+  become: True
+  systemd:
+    name: iscsid.service
+    enabled: no
+    state: stopped
+  when: ansible_distribution == "Ubuntu"
+
+- name: Disable open-iscsi service
+  become: True
+  systemd:
+    name: open-iscsi.service
+    enabled: no
+    state: stopped
+  when: ansible_distribution == "Ubuntu"

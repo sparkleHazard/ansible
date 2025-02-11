@@ -1,0 +1,10 @@
+---
+- name: Set default shell to zsh for target user
+  user:
+    name: "{{ target_user }}"
+    shell: /bin/zsh
+  vars:
+    # If not defined elsewhere, default to ansible_env.USER
+    target_user: "{{ (ansible_env.USER | default('')) | lower }}"
+  when: target_user != 'root' and target_user != ""
+  become: True

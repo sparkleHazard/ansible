@@ -1,0 +1,36 @@
+---
+- name: Set permissions on update-motd scripts
+  become: True
+  file:
+    path: "{{ motd_script }}"
+    mode: "0644"
+  loop:
+    - /etc/update-motd.d/10-help-text
+    - /etc/update-motd.d/50-motd-news
+    - /etc/update-motd.d/50-landscape-sysinfo
+    - /etc/update-motd.d/85-fwupd
+    - /etc/update-motd.d/90-updates-available
+    - /etc/update-motd.d/91-contract-ua-esm-status
+    - /etc/update-motd.d/91-release-upgrade
+    - /etc/update-motd.d/92-unattended-upgrades
+    - /etc/update-motd.d/95-hwe-eol
+    - /etc/update-motd.d/95-hwe-eol
+    - /etc/update-motd.d/97-overlayroot
+    - /etc/update-motd.d/98-fsck-at-reboot
+    - /etc/update-motd.d/98-reboot-required
+  loop_control:
+    loop_var: motd_script
+  when: ansible_distribution == "Ubuntu"
+
+# Create a new update-motd script that displays the hostname using figlet
+- name: Create /etc/update-motd.d/05-hostname to display hostname with figlet
+  become: True
+  copy:
+    dest: /etc/update-motd.d/05-hostname
+    content: |
+      #!/bin/sh
+      figlet -f slant {{ ansible_hostname }}
+    owner: root
+    group: root
+    mode: "0755"
+  when: ansible_distribution == "Ubuntu"

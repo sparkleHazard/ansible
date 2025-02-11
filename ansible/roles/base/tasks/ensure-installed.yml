@@ -1,0 +1,68 @@
+---
+- name: Ensure kitty-terminfo is installed on Debian/Ubuntu
+  apt:
+    name: kitty-terminfo
+    state: present
+  when: ansible_os_family == "Debian"
+  become: True
+
+- name: Ensure kitty-terminfo is installed on RedHat/CentOS
+  yum:
+    name: kitty-terminfo
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: True
+
+- name: Ensure rsync is installed on Debian/Ubuntu
+  package:
+    name: rsync
+    state: present
+  when: ansible_os_family == "Debian"
+  become: True
+
+- name: Ensure rsync is installed on RedHat/CentOS/Fedora
+  package:
+    name: rsync
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: True
+
+- name: Ensure rsync is installed on macOS using Homebrew
+  community.general.homebrew:
+    name: rsync
+    state: present
+  when: ansible_os_family == "Darwin"
+
+- name: Install zsh on Debian/Ubuntu
+  package:
+    name: zsh
+    state: present
+  when: ansible_os_family == "Debian"
+  become: True
+
+- name: Install zsh on RedHat/CentOS/Fedora
+  package:
+    name: zsh
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: True
+
+- name: Install zsh on Darwin (macOS) using Homebrew
+  community.general.homebrew:
+    name: zsh
+    state: present
+  when: ansible_os_family == "Darwin"
+
+- name: Install qemu-guest-agent if running in a QEMU/KVM virtual machine
+  package:
+    name: qemu-guest-agent
+    state: present
+  when: (ansible_virtualization_role == "guest") and (ansible_virtualization_type in ["qemu", "kvm"])
+  become: True
+
+- name: Ensure figlet is installed
+  become: True
+  apt:
+    name: figlet
+    state: present
+  when: ansible_distribution == "Ubuntu"
