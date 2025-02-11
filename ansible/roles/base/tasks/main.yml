@@ -1,5 +1,6 @@
 ---
 - import_tasks: ensure-installed.yml
+- import_tasks: tmux-config.yml
 - import_tasks: set-zsh.yml
 - import_tasks: ubuntu-disable-cloud-init.yml
 - import_tasks: ubuntu-motd.yml

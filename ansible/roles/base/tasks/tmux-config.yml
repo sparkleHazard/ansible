@@ -1,0 +1,18 @@
+---
+- name: Check if TPM directory exists
+  stat:
+    path: "{{ ansible_env.XDG_CONFIG_HOME | default('~/.config') }}/tmux/plugins/tpm"
+  register: tpm_dir
+
+- name: Find contents of TPM directory if it exists
+  find:
+    paths: "{{ ansible_env.XDG_CONFIG_HOME | default('~/.config') }}/tmux/plugins/tpm"
+  register: tpm_files
+  when: tpm_dir.stat.exists
+
+- name: Clone TPM if missing or empty
+  git:
+    repo: "https://github.com/tmux-plugins/tpm"
+    dest: "{{ ansible_env.XDG_CONFIG_HOME | default('~/.config') }}/tmux/plugins/tpm"
+    version: "HEAD"
+  when: (not tpm_dir.stat.exists) or (tpm_files.matched == 0)
