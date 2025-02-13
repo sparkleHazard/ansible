@@ -1,6 +1,9 @@
 ---
-- import_tasks: ensure-installed.yml
-- import_tasks: tmux-config.yml
-- import_tasks: set-zsh.yml
-- import_tasks: ubuntu-disable-cloud-init.yml
-- import_tasks: ubuntu-motd.yml
+- include_tasks: "{{ item }}"
+  loop:
+    - ensure-installed.yml
+    - tmux-config.yml
+    - set-zsh.yml
+    - ubuntu-disable-cloud-init.yml
+    - ubuntu-motd.yml
+  when: ansible_distribution not it ["Raspbian", "Raspberry Pi OS"]

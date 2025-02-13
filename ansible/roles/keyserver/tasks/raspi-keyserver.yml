@@ -1,0 +1,82 @@
+---
+- name: Configure static IP for Raspberry Pi using dhcpcd
+  blockinfile:
+    path: /etc/dhcpcd.conf
+    marker: "# {mark} ANSIBLE STATIC IP CONFIGURATION"
+    block: |
+      interface {{ ansible_default_ipv4.interface | default('eth0') }}
+      static ip_address={{ static_ip }}/{{ cidr }}
+      static routers={{ gateway }}
+      static domain_name_servers {{ dns_primary }} {{ dns_secondary }}
+  become: True
+  when: ansible_distribution in ["Raspbian", "Raspberry Pi OS"]
+
+- name: Restart dhcpcd service to apply static IP configuration
+  service:
+    name: dhcpcd
+    state: restarted
+  become: True
+  when: ansible_distribution in ["Raspbian", "Raspberry Pi OS"]
+
+- name: Ensure rsync is installed
+  apt:
+    name: rsync
+    state: present
+  become: True
+  when: ansible_os_family == "Debian"
+
+- name: Create directory for key distribution
+  file:
+    path: /var/keys
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: True
+
+- name: Copy GitHub SSH private key for distribution
+  copy:
+    src: "{{ ansible_env.HOME }}/.ssh/id_ecdsa_github"
+    dest: /var/keys/id_ecdsa_github
+    owner: root
+    group: root
+    mode: "0600"
+  become: True
+
+- name: Deploy rsync daemon configuration for key distribution
+  copy:
+    dest: /etc/rsyncd.conf
+    content: |
+      pid file = /var/run/rsyncd.pid
+      log file = /var/log/rsyncd.log
+      uid = root
+      gid = root
+      use chroot = no
+
+      [keys]
+      path = /var/keys
+      comment = "Distribution of GitHub SSH private key for keyserver"
+      read only = yes
+      list = yes
+      auth users = keyuser
+      secrets file = /etc/rsyncd.secrets
+    owner: root
+    group: root
+    mode: "0644"
+  become: True
+
+- name: Deploy rsync secrets file
+  copy:
+    dest: /etc/rsyncd.secrets
+    content: "keyuser:YOUR_SECRET_PASSWORD\n"
+    owner: root
+    group: root
+    mode: "0600"
+  become: True
+
+- name: Ensure rsync daemon is started and enabled
+  systemd:
+    name: rsync
+    state: started
+    enabled: yes
+  become: True

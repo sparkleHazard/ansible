@@ -1,0 +1,42 @@
+---
+- name: Ensure target user for passwordless sudo is defined
+  set_fact:
+    sudo_user: "{{ ansible_env.USER | default('') }}"
+  when: ansible_env.USER is defined and ansible_env.USER != "root"
+  become: True
+
+# Check if running as root and Homebrew is not installed
+- name: Check if Homebrew is installed
+  shell: "command -v brew"
+  register: brew_check
+  failed_when: false
+  changed_when: false
+  when: ansible_system in ["Linux", "Darwin"]
+
+- name: Install Homebrew
+  shell: |
+    echo "Homebrew not found. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  args:
+    executable: /bin/bash
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - brew_check.rc != 0
+    - ansible_user_id != "root"
+
+- name: Update Homebrew
+  homebrew:
+    update_homebrew: True
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - ansible_user_id != "root"
+
+- name: Install Homebrew Packages
+  homebrew:
+    name: "{{ brew_packages }}"
+    state: present
+  register: homebrew_install_result
+  until: homebrew_install_result is success
+  when:
+    - ansible_system in ["Linux", "Darwin"]
+    - ansible_user_id != "root"
